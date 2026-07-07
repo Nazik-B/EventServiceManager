@@ -1,0 +1,6 @@
+@MyWebApiEventSrvManagerProj_HostAddress = http://localhost:5102
+
+GET {{MyWebApiEventSrvManagerProj_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

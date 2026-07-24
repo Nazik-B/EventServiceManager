@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using EventsApi.Models;
+using EventsApi.Models.Dto;
 using EventsApi.Services;
 
 namespace EventsApi.Controllers;
@@ -17,14 +17,14 @@ public class EventsController : ControllerBase
 
     // GET /events
     [HttpGet]
-    public ActionResult<IEnumerable<Event>> GetAll()
+    public ActionResult<IEnumerable<EventResponse>> GetAll()
     {
         return Ok(_eventService.GetAll());
     }
 
     // GET /events/{id}
     [HttpGet("{id:int}")]
-    public ActionResult<Event> GetById(int id)
+    public ActionResult<EventResponse> GetById(int id)
     {
         var eventItem = _eventService.GetById(id);
         if (eventItem is null)
@@ -35,17 +35,17 @@ public class EventsController : ControllerBase
 
     // POST /events
     [HttpPost]
-    public ActionResult<Event> Create([FromBody] Event eventItem)
+    public ActionResult<EventResponse> Create([FromBody] CreateEventRequest request)
     {
-        var created = _eventService.Create(eventItem);
+        var created = _eventService.Create(request);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     // PUT /events/{id}
     [HttpPut("{id:int}")]
-    public IActionResult Update(int id, [FromBody] Event eventItem)
+    public IActionResult Update(int id, [FromBody] UpdateEventRequest request)
     {
-        var updated = _eventService.Update(id, eventItem);
+        var updated = _eventService.Update(id, request);
         if (!updated)
             return NotFound();
 

@@ -1,12 +1,12 @@
-using EventsApi.Models;
+using EventsApi.Models.Dto;
 
 namespace EventsApi.Services;
 
 public interface IEventService
 {
-    IEnumerable<Event> GetAll();
-    Event? GetById(int id);
-    Event Create(Event eventItem);
-    bool Update(int id, Event eventItem);
+    IEnumerable<EventResponse> GetAll();
+    EventResponse? GetById(int id);
+    EventResponse Create(CreateEventRequest request);
+    bool Update(int id, UpdateEventRequest request);
     bool Delete(int id);
 }

@@ -23,8 +23,8 @@ public class EventService : IEventService
             Id = _events.Count == 0 ? 1 : _events.Max(e => e.Id) + 1,
             Title = request.Title,
             Description = request.Description,
-            StartAt = request.StartAt,
-            EndAt = request.EndAt
+            StartAt = request.StartAt!.Value,
+            EndAt = request.EndAt!.Value
         };
 
         _events.Add(eventItem);
@@ -39,8 +39,8 @@ public class EventService : IEventService
 
         existing.Title = request.Title;
         existing.Description = request.Description;
-        existing.StartAt = request.StartAt;
-        existing.EndAt = request.EndAt;
+        existing.StartAt = request.StartAt!.Value;
+        existing.EndAt = request.EndAt!.Value;
         return true;
     }
 

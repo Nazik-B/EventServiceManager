@@ -10,14 +10,14 @@ public class UpdateEventRequest : IValidatableObject
     public string? Description { get; set; }
 
     [Required(ErrorMessage = "StartAt is required")]
-    public DateTime StartAt { get; set; }
+    public DateTime? StartAt { get; set; }
 
     [Required(ErrorMessage = "EndAt is required")]
-    public DateTime EndAt { get; set; }
+    public DateTime? EndAt { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (EndAt <= StartAt)
+        if (StartAt.HasValue && EndAt.HasValue && EndAt <= StartAt)
         {
             yield return new ValidationResult(
                 "EndAt must be later than StartAt",

@@ -1,12 +1,13 @@
 # Event Service Manager API
 
-Учебный проект ASP.NET Core Web API для управления событиями (Event). Реализован CRUD, валидация входных данных и документация через Swagger.
+Учебный проект ASP.NET Core Web API для управления событиями (Event). Реализован CRUD, валидация входных данных, фильтрация, пагинация, централизованная обработка ошибок и документация через Swagger.
 
 ## Стек технологий
 
 - .NET 10 / ASP.NET Core Web API
 - Swashbuckle.AspNetCore (Swagger UI)
 - In-memory хранилище (List<Event> в сервисе)
+- xUnit (unit-тестирование)
 
 ## Требования
 
@@ -15,12 +16,12 @@
 
 ## Запуск проекта
 
-Клонируйте репозиторий и перейдите в ветку `sprint-1`, где ведётся вся разработка:
+Клонируйте репозиторий и перейдите в ветку `sprint-2`, где ведётся текущая разработка:
 
 ```bash
 git clone <URL_репозитория>
 cd EventServiceManager
-git checkout sprint-1
+git checkout sprint-2
 ```
 
 Перейдите в папку с файлом проекта (`.csproj`) и восстановите зависимости:
@@ -36,29 +37,71 @@ dotnet restore
 dotnet run
 ```
 
+По умолчанию сервис доступен по адресу `http://localhost:5102`.
+Документация Swagger доступна по адресу `http://localhost:5102/swagger`.
+
 ## Валидация
 
 - `Title`, `StartAt`, `EndAt` — обязательные поля.
-- `EndAt` должен быть строго позже `StartAt`, иначе API вернёт `400 Bad Request` с описанием ошибки.
-- При создании и обновлении используются отдельные DTO (`CreateEventRequest`, `UpdateEventRequest`), клиент не может передавать `Id` вручную.
+- `Description` — опциональное поле (может быть `null`).
+- `EndAt` должен быть строго позже `StartAt`, иначе API вернёт `400 Bad Request` с описанием ошибки в поле `EndAt` ("EndAt must be later than StartAt").
+- При создании и обновлении используются отдельные DTO (`CreateEventRequest`, `UpdateEventRequest`), клиент не может передавать `Id` вручную — идентификатор генерируется сервисом автоматически.
 
 ## Эндпоинты API
 
 | Метод  | URL              | Описание                          | Успех         | Ошибка              |
 |--------|------------------|------------------------------------|---------------|----------------------|
-| GET    | /events          | Получить список всех событий       | 200 OK        | —                    |
+| GET    | /events          | Получить список событий (с фильтрацией и пагинацией) | 200 OK | — |
 | GET    | /events/{id}     | Получить событие по id             | 200 OK        | 404 Not Found        |
 | POST   | /events          | Создать новое событие              | 201 Created   | 400 Bad Request      |
 | PUT    | /events/{id}     | Обновить событие целиком           | 204 No Content| 404 Not Found, 400 Bad Request |
 | DELETE | /events/{id}     | Удалить событие                    | 204 No Content| 404 Not Found        |
+
+## GET /events — параметры фильтрации и пагинации
+
+Эндпоинт поддерживает следующие опциональные query-параметры. Все фильтры применяются совместно (логическое И):
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `title` | string | — | Поиск по названию события, регистронезависимый, частичное совпадение |
+| `from` | DateTime | — | Возвращает события, которые начинаются не раньше указанной даты (`StartAt >= from`) |
+| `to` | DateTime | — | Возвращает события, которые заканчиваются не позже указанной даты (`EndAt <= to`) |
+| `page` | int | 1 | Номер страницы результатов |
+| `pageSize` | int | 10 | Количество элементов на странице |
+
+### Формат ответа GET /events
+
+Ответ возвращается в виде объекта `PaginatedResult`:
+
+```json
+{
+  "totalCount": 3,
+  "items": [
+    {
+      "id": 1,
+      "title": "Team Meeting",
+      "description": null,
+      "startAt": "2026-08-01T10:00:00",
+      "endAt": "2026-08-01T11:00:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10
+}
+```
+
+- `totalCount` — общее количество событий, соответствующих фильтрам (без учёта пагинации)
+- `items` — массив событий на текущей странице
+- `page` — номер текущей страницы
+- `pageSize` — размер страницы
 
 ## Примеры запросов (curl)
 
 ### Создание события
 
 ```bash
-curl -X POST http://localhost:5102/events \
-  -H "Content-Type: application/json" \
+curl -X POST http://localhost:5102/events \\
+  -H "Content-Type: application/json" \\
   -d '{"title":"Standup","description":"Daily meeting","startAt":"2026-07-09T10:00:00","endAt":"2026-07-09T10:15:00"}'
 ```
 
@@ -66,6 +109,22 @@ curl -X POST http://localhost:5102/events \
 
 ```bash
 curl http://localhost:5102/events
+```
+
+### Получение списка событий с фильтрацией и пагинацией
+
+```bash
+# Поиск по названию
+curl "http://localhost:5102/events?title=standup"
+
+# Фильтр по диапазону дат
+curl "http://localhost:5102/events?from=2026-08-01T00:00:00&to=2026-08-31T23:59:59"
+
+# Пагинация
+curl "http://localhost:5102/events?page=2&pageSize=5"
+
+# Комбинированный запрос
+curl "http://localhost:5102/events?title=review&from=2026-08-01T00:00:00&to=2026-08-31T23:59:59&page=1&pageSize=10"
 ```
 
 ### Получение события по id
@@ -77,8 +136,8 @@ curl http://localhost:5102/events/1
 ### Обновление события
 
 ```bash
-curl -X PUT http://localhost:5102/events/1 \
-  -H "Content-Type: application/json" \
+curl -X PUT http://localhost:5102/events/1 \\
+  -H "Content-Type: application/json" \\
   -d '{"title":"Updated Standup","startAt":"2026-07-09T11:00:00","endAt":"2026-07-09T11:30:00"}'
 ```
 
@@ -86,4 +145,70 @@ curl -X PUT http://localhost:5102/events/1 \
 
 ```bash
 curl -X DELETE http://localhost:5102/events/1
+```
+
+## Формат ответа при ошибках
+
+Все ошибки API возвращаются в едином формате **Problem Details** (RFC 9110), с соответствующим HTTP-статусом:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "Event with id 999 was not found",
+  "instance": "/events/999",
+  "traceId": "0HNNAG8906Q2O:00000001"
+}
+```
+
+### Соответствие типов ошибок и статус-кодов
+
+| Статус | Когда возвращается |
+|---|---|
+| 400 Bad Request | Ошибки валидации входных данных (пустой Title, EndAt раньше StartAt, отсутствующие обязательные поля) |
+| 404 Not Found | Событие с указанным ID не найдено (GET, PUT, DELETE) |
+| 409 Conflict | Конфликт состояния (InvalidOperationException) |
+| 500 Internal Server Error | Непредвиденные ошибки сервера |
+
+### Поля ответа об ошибке
+
+| Поле | Описание |
+|---|---|
+| `type` | Ссылка на секцию RFC 9110, описывающую данный класс ошибки |
+| `title` | Краткое человекочитаемое описание ошибки |
+| `status` | HTTP статус-код |
+| `detail` | Детальное сообщение об ошибке |
+| `instance` | Путь запроса, вызвавшего ошибку |
+| `traceId` | Уникальный идентификатор запроса для трассировки в логах |
+
+Все ошибки логируются через встроенный `ILogger`: клиентские ошибки (4xx) — на уровне `Warning`, непредвиденные серверные ошибки (5xx) — на уровне `Error`.
+
+## Запуск тестов
+
+Проект включает отдельный тестовый проект `EventService.Tests` на xUnit, содержащий unit-тесты для `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации).
+
+Запустить все тесты из корня решения:
+
+```bash
+dotnet test
+```
+
+Запустить тесты только для конкретного проекта:
+
+```bash
+cd EventService.Tests
+dotnet test
+```
+
+Запустить тесты с отчётом о покрытии кода:
+
+```bash
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+Ожидаемый результат при успешном прохождении всех тестов:
+
+```
+Сводка теста: всего: 31; сбой: 0; успешно: 31; пропущено: 0
 ```

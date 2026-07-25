@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using EventsApi.Models.Dto;
 using EventsApi.Services;
+using MyWebApiEventSrvManagerProj.Exceptions;
 
 namespace EventsApi.Controllers;
 
@@ -28,7 +29,9 @@ public class EventsController : ControllerBase
     {
         var eventItem = _eventService.GetById(id);
         if (eventItem is null)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return Ok(eventItem);
     }
@@ -47,7 +50,9 @@ public class EventsController : ControllerBase
     {
         var updated = _eventService.Update(id, request);
         if (!updated)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return NoContent();
     }
@@ -58,7 +63,9 @@ public class EventsController : ControllerBase
     {
         var deleted = _eventService.Delete(id);
         if (!deleted)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return NoContent();
     }

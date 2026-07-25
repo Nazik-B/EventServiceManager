@@ -1,13 +1,19 @@
-using System.Net;
+using MyWebApiEventSrvManagerProj.Middleware;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventsApi.Middleware;
+namespace MyWebApiEventSrvManagerProj.Middleware;
 
 public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
@@ -32,39 +38,25 @@ public class ExceptionHandlingMiddleware
 
     private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, title) = MapException(exception);
+        var (statusCode, title) = ExceptionMapper.MapException(exception);
 
         var problemDetails = new ProblemDetails
         {
-            Status = statusCode,
-            Title = title,
             Type = $"https://tools.ietf.org/html/rfc9110#section-15.{GetSectionSuffix(statusCode)}",
+            Title = title,
+            Status = statusCode,
             Detail = exception.Message,
             Instance = context.Request.Path
         };
-
         problemDetails.Extensions["traceId"] = context.TraceIdentifier;
 
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
-        var json = JsonSerializer.Serialize(problemDetails, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });        
-
+        var json = JsonSerializer.Serialize(problemDetails, _jsonOptions);
         return context.Response.WriteAsync(json);
     }
 
-    private static (int StatusCode, string Title) MapException(Exception exception) => exception switch
-    {
-        ArgumentNullException => ((int)HttpStatusCode.BadRequest, "Invalid request argument"),
-        ArgumentException => ((int)HttpStatusCode.BadRequest, "Invalid request argument"),
-        KeyNotFoundException => ((int)HttpStatusCode.NotFound, "Resource not found"),
-        UnauthorizedAccessException => ((int)HttpStatusCode.Unauthorized, "Unauthorized"),
-        InvalidOperationException => ((int)HttpStatusCode.Conflict, "Invalid operation"),
-        _ => ((int)HttpStatusCode.InternalServerError, "An unexpected error occurred")
-    };
 
     private static string GetSectionSuffix(int statusCode) => statusCode switch
     {

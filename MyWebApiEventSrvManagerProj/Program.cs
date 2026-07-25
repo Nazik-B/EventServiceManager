@@ -1,4 +1,4 @@
-using EventsApi.Middleware;
+using MyWebApiEventSrvManagerProj.Middleware;
 using EventsApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);

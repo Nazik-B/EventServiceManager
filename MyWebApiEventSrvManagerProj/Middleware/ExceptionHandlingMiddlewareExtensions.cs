@@ -1,4 +1,4 @@
-namespace EventsApi.Middleware;
+namespace MyWebApiEventSrvManagerProj.Middleware;
 
 public static class ExceptionHandlingMiddlewareExtensions
 {

@@ -16,11 +16,15 @@ public class EventsController : ControllerBase
         _eventService = eventService;
     }
 
-    // GET /events
+    // GET /events?title=...&from=...&to=...
     [HttpGet]
-    public ActionResult<IEnumerable<EventResponse>> GetAll()
+    public ActionResult<IEnumerable<EventResponse>> GetAll(
+        [FromQuery] string? title,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
     {
-        return Ok(_eventService.GetAll());
+        var events = _eventService.GetAll(title, from, to);
+        return Ok(events);
     }
 
     // GET /events/{id}
@@ -70,7 +74,7 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
-    // GET /events/test-error — для тестирования middleware
+        // GET /events/test-error — для тестирования middleware
     /*[HttpGet("test-error")]
     public IActionResult TestError()
     {

@@ -7,8 +7,27 @@ public class EventService : IEventService
 {
     private readonly List<Event> _events = new();
 
-    public IEnumerable<EventResponse> GetAll() =>
-        _events.Select(MapToResponse);
+    public IEnumerable<EventResponse> GetAll(string? title, DateTime? from, DateTime? to)
+    {
+        var query = _events.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartAt >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(e => e.EndAt <= to.Value);
+        }
+
+        return query.Select(MapToResponse).ToList();
+    }        
 
     public EventResponse? GetById(int id)
     {

@@ -69,4 +69,12 @@ public class EventsController : ControllerBase
 
         return NoContent();
     }
+
+    // GET /events/test-error — для тестирования middleware
+    /*[HttpGet("test-error")]
+    public IActionResult TestError()
+    {
+        throw new InvalidOperationException("Тестовое исключение для проверки middleware");
+    }
+    */
 }

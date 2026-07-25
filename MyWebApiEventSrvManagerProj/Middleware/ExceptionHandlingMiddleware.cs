@@ -1,4 +1,3 @@
-using MyWebApiEventSrvManagerProj.Middleware;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +18,7 @@ public class ExceptionHandlingMiddleware
     {
         _next = next;
         _logger = logger;
-    }
+    }  
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -29,16 +28,15 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception occurred while processing {Method} {Path}",
-                context.Request.Method, context.Request.Path);
-
             await HandleExceptionAsync(context, ex);
         }
     }
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         var (statusCode, title) = ExceptionMapper.MapException(exception);
+
+        LogException(context, exception, statusCode);
 
         var problemDetails = new ProblemDetails
         {
@@ -57,6 +55,25 @@ public class ExceptionHandlingMiddleware
         return context.Response.WriteAsync(json);
     }
 
+    private void LogException(HttpContext context, Exception exception, int statusCode)
+    {
+        var method = context.Request.Method;
+        var path = context.Request.Path;
+        var traceId = context.TraceIdentifier;
+
+        if (statusCode >= 500  || statusCode == 409)
+        {
+            _logger.LogError(exception,
+                "Server-side or conflict error while processing {Method} {Path}. StatusCode: {StatusCode}, TraceId: {TraceId}",
+                method, path, statusCode, traceId);
+        }
+        else if (statusCode >= 400)
+        {
+            _logger.LogWarning(
+                "Client error occurred while processing {Method} {Path}. StatusCode: {StatusCode}, Message: {Message}, TraceId: {TraceId}",
+                method, path, statusCode, exception.Message, traceId);
+        }
+    }
 
     private static string GetSectionSuffix(int statusCode) => statusCode switch
     {

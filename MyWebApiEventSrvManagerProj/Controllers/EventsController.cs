@@ -16,15 +16,17 @@ public class EventsController : ControllerBase
         _eventService = eventService;
     }
 
-    // GET /events?title=...&from=...&to=...
+    // GET /events?title=...&from=...&to=...&page=1&pageSize=10
     [HttpGet]
-    public ActionResult<IEnumerable<EventResponse>> GetAll(
+    public ActionResult<PaginatedResult<EventResponse>> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to)
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var events = _eventService.GetAll(title, from, to);
-        return Ok(events);
+        var result = _eventService.GetAll(title, from, to, page, pageSize);
+        return Ok(result);
     }
 
     // GET /events/{id}

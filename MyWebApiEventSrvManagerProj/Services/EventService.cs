@@ -7,8 +7,11 @@ public class EventService : IEventService
 {
     private readonly List<Event> _events = new();
 
-    public IEnumerable<EventResponse> GetAll(string? title, DateTime? from, DateTime? to)
+    public PaginatedResult<EventResponse> GetAll(string? title, DateTime? from, DateTime? to, int page, int pageSize)
     {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+
         var query = _events.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(title))
@@ -26,8 +29,22 @@ public class EventService : IEventService
             query = query.Where(e => e.EndAt <= to.Value);
         }
 
-        return query.Select(MapToResponse).ToList();
-    }        
+        var totalCount = query.Count();
+
+        var items = query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MapToResponse)
+            .ToList();
+
+        return new PaginatedResult<EventResponse>
+        {
+            TotalCount = totalCount,
+            Items = items,
+            Page = page,
+            PageSize = pageSize
+        };
+    }       
 
     public EventResponse? GetById(int id)
     {

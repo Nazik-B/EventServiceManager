@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using EventsApi.Models.Dto;
 using EventsApi.Services;
 using Xunit;
@@ -279,5 +280,128 @@ public class EventServiceTests
         Assert.Contains(result.Items, e => e.Title == "Team Retro");
         Assert.DoesNotContain(result.Items, e => e.Title == "Client Call");
         Assert.DoesNotContain(result.Items, e => e.Title == "Team Planning");
+    }
+
+    // 10. Получение события с несуществующим ID (дополнительный кейс)
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(999999)]
+    public void GetById_ReturnsNull_ForVariousNonExistentIds(int id)
+    {
+        var service = CreateService();
+        service.Create(BuildRequest("Existing Event", DateTime.Parse("2026-08-01T10:00:00"), DateTime.Parse("2026-08-01T11:00:00")));
+
+        var found = service.GetById(id);
+
+        Assert.Null(found);
+    }
+
+    // 11. Обновление события с несуществующим ID (дополнительный кейс)
+    [Fact]
+    public void Update_DoesNotAffectExistingEvents_WhenIdNotFound()
+    {
+        var service = CreateService();
+        var created = service.Create(BuildRequest("Original", DateTime.Parse("2026-08-01T10:00:00"), DateTime.Parse("2026-08-01T11:00:00")));
+
+        var updateRequest = new UpdateEventRequest
+        {
+            Title = "Should Not Apply",
+            StartAt = DateTime.Parse("2026-09-01T10:00:00"),
+            EndAt = DateTime.Parse("2026-09-01T11:00:00")
+        };
+
+        var result = service.Update(999, updateRequest);
+        var unchanged = service.GetById(created.Id);
+
+        Assert.False(result);
+        Assert.Equal("Original", unchanged!.Title);
+    }
+
+    // 12. Создание события с некорректными данными (валидация DataAnnotations на уровне DTO)
+    [Fact]
+    public void CreateEventRequest_FailsValidation_WhenTitleIsEmpty()
+    {
+        var request = new CreateEventRequest
+        {
+            Title = "",
+            StartAt = DateTime.Parse("2026-08-01T10:00:00"),
+            EndAt = DateTime.Parse("2026-08-01T11:00:00")
+        };
+
+        var validationResults = ValidateModel(request);
+
+        Assert.NotEmpty(validationResults);
+        Assert.Contains(validationResults, r => r.MemberNames.Contains(nameof(CreateEventRequest.Title)));
+    }
+
+    [Fact]
+    public void CreateEventRequest_FailsValidation_WhenStartAtIsNull()
+    {
+        var request = new CreateEventRequest
+        {
+            Title = "Valid Title",
+            StartAt = null,
+            EndAt = DateTime.Parse("2026-08-01T11:00:00")
+        };
+
+        var validationResults = ValidateModel(request);
+
+        Assert.NotEmpty(validationResults);
+    }
+
+    // 13. Обновление события с некорректными датами (EndAt раньше StartAt)
+    [Fact]
+    public void UpdateEventRequest_FailsValidation_WhenEndAtIsBeforeStartAt()
+    {
+        var request = new UpdateEventRequest
+        {
+            Title = "Invalid Dates",
+            StartAt = DateTime.Parse("2026-08-01T12:00:00"),
+            EndAt = DateTime.Parse("2026-08-01T10:00:00")
+        };
+
+        var validationResults = ValidateModel(request);
+
+        Assert.NotEmpty(validationResults);
+        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("EndAt") || r.ErrorMessage.Contains("StartAt"));
+    }
+
+    [Fact]
+    public void CreateEventRequest_FailsValidation_WhenEndAtIsBeforeStartAt()
+    {
+        var request = new CreateEventRequest
+        {
+            Title = "Invalid Dates",
+            StartAt = DateTime.Parse("2026-08-01T12:00:00"),
+            EndAt = DateTime.Parse("2026-08-01T10:00:00")
+        };
+
+        var validationResults = ValidateModel(request);
+
+        Assert.NotEmpty(validationResults);
+    }
+
+    [Fact]
+    public void CreateEventRequest_PassesValidation_WhenDatesAreValid()
+    {
+        var request = new CreateEventRequest
+        {
+            Title = "Valid Event",
+            StartAt = DateTime.Parse("2026-08-01T10:00:00"),
+            EndAt = DateTime.Parse("2026-08-01T12:00:00")
+        };
+
+        var validationResults = ValidateModel(request);
+
+        Assert.Empty(validationResults);
+    }
+
+    private static List<ValidationResult> ValidateModel(object model)
+    {
+        var context = new ValidationContext(model);
+        var results = new List<ValidationResult>();
+        Validator.TryValidateObject(model, context, results, validateAllProperties: true);
+        return results;
     }
 }

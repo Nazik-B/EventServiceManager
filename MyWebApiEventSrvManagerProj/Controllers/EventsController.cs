@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using EventsApi.Models;
+using EventsApi.Models.Dto;
 using EventsApi.Services;
+using MyWebApiEventSrvManagerProj.Exceptions;
 
 namespace EventsApi.Controllers;
 
@@ -15,39 +16,49 @@ public class EventsController : ControllerBase
         _eventService = eventService;
     }
 
-    // GET /events
+    // GET /events?title=...&from=...&to=...&page=1&pageSize=10
     [HttpGet]
-    public ActionResult<IEnumerable<Event>> GetAll()
+    public ActionResult<PaginatedResult<EventResponse>> GetAll(
+        [FromQuery] string? title,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(_eventService.GetAll());
+        var result = _eventService.GetAll(title, from, to, page, pageSize);
+        return Ok(result);
     }
 
     // GET /events/{id}
     [HttpGet("{id:int}")]
-    public ActionResult<Event> GetById(int id)
+    public ActionResult<EventResponse> GetById(int id)
     {
         var eventItem = _eventService.GetById(id);
         if (eventItem is null)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return Ok(eventItem);
     }
 
     // POST /events
     [HttpPost]
-    public ActionResult<Event> Create([FromBody] Event eventItem)
+    public ActionResult<EventResponse> Create([FromBody] CreateEventRequest request)
     {
-        var created = _eventService.Create(eventItem);
+        var created = _eventService.Create(request);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     // PUT /events/{id}
     [HttpPut("{id:int}")]
-    public IActionResult Update(int id, [FromBody] Event eventItem)
+    public IActionResult Update(int id, [FromBody] UpdateEventRequest request)
     {
-        var updated = _eventService.Update(id, eventItem);
+        var updated = _eventService.Update(id, request);
         if (!updated)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return NoContent();
     }
@@ -58,8 +69,18 @@ public class EventsController : ControllerBase
     {
         var deleted = _eventService.Delete(id);
         if (!deleted)
-            return NotFound();
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
 
         return NoContent();
     }
+
+        // GET /events/test-error — для тестирования middleware
+    /*[HttpGet("test-error")]
+    public IActionResult TestError()
+    {
+        throw new InvalidOperationException("Тестовое исключение для проверки middleware");
+    }
+    */
 }

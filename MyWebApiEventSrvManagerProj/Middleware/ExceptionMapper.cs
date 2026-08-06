@@ -14,7 +14,6 @@ public static class ExceptionMapper
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid argument"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
-            InvalidOperationException => (StatusCodes.Status409Conflict, "Invalid operation"),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error")
         };
     }

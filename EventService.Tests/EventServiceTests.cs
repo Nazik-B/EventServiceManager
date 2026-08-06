@@ -45,6 +45,15 @@ public class EventServiceTests
         Assert.Equal(2, second.Id);
     }
 
+    [Fact]
+    public void Create_ThrowsValidationException_WhenEndAtBeforeStartAt()
+    {
+        var service = CreateService();
+        var request = BuildRequest("Invalid Event", DateTime.Parse("2026-08-01T12:00:00"), DateTime.Parse("2026-08-01T10:00:00"));
+
+        Assert.Throws<ValidationException>(() => service.Create(request));
+    }
+
     // 2. Получение всех событий
     [Fact]
     public void GetAll_ReturnsEmptyResult_WhenNoEventsExist()
@@ -126,6 +135,38 @@ public class EventServiceTests
         {
             Title = "New Title",
             StartAt = DateTime.Parse("2026-08-05T09:00:00"),
+            EndAt = DateTime.Parse("2026-08-05T10:00:00")
+        };
+
+        var result = service.Update(999, updateRequest);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void Update_ThrowsValidationException_WhenEndAtBeforeStartAt()
+    {
+        var service = CreateService();
+        var created = service.Create(BuildRequest("Original", DateTime.Parse("2026-08-01T10:00:00"), DateTime.Parse("2026-08-01T11:00:00")));
+
+        var updateRequest = new UpdateEventRequest
+        {
+            Title = "Broken Update",
+            StartAt = DateTime.Parse("2026-08-05T12:00:00"),
+            EndAt = DateTime.Parse("2026-08-05T10:00:00")
+        };
+
+        Assert.Throws<ValidationException>(() => service.Update(created.Id, updateRequest));
+    }
+
+    [Fact]
+    public void Update_DoesNotThrow_WhenEventNotFound_EvenWithInvalidDates()
+    {
+        var service = CreateService();
+        var updateRequest = new UpdateEventRequest
+        {
+            Title = "Nonexistent",
+            StartAt = DateTime.Parse("2026-08-05T12:00:00"),
             EndAt = DateTime.Parse("2026-08-05T10:00:00")
         };
 
@@ -350,7 +391,7 @@ public class EventServiceTests
         Assert.NotEmpty(validationResults);
     }
 
-    // 13. Обновление события с некорректными датами (EndAt раньше StartAt)
+    // 13. Обновление события с некорректными датами (EndAt раньше StartAt) на уровне DTO
     [Fact]
     public void UpdateEventRequest_FailsValidation_WhenEndAtIsBeforeStartAt()
     {

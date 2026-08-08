@@ -4,8 +4,6 @@ namespace EventsApi.Services;
 
 public interface IBookingService
 {
-    IEnumerable<Booking> GetAll();
-    Booking? GetById(Guid id);
-    Booking Create(Guid eventId);
-    bool Delete(Guid id);
+    Task<Booking> CreateBookingAsync(Guid eventId);
+    Task<Booking?> GetBookingByIdAsync(Guid bookingId);
 }

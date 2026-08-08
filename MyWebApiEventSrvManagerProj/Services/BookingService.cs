@@ -6,12 +6,7 @@ public class BookingService : IBookingService
 {
     private readonly List<Booking> _bookings = new();
 
-    public IEnumerable<Booking> GetAll() => _bookings;
-
-    public Booking? GetById(Guid id) =>
-        _bookings.FirstOrDefault(b => b.Id == id);
-
-    public Booking Create(Guid eventId)
+    public Task<Booking> CreateBookingAsync(Guid eventId)
     {
         var booking = new Booking
         {
@@ -23,16 +18,12 @@ public class BookingService : IBookingService
         };
 
         _bookings.Add(booking);
-        return booking;
+        return Task.FromResult(booking);
     }
 
-    public bool Delete(Guid id)
+    public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
     {
-        var existing = GetById(id);
-        if (existing is null)
-            return false;
-
-        _bookings.Remove(existing);
-        return true;
+        var booking = _bookings.FirstOrDefault(b => b.Id == bookingId);
+        return Task.FromResult(booking);
     }
 }

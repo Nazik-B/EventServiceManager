@@ -27,22 +27,23 @@ public class EventServiceTests
 
         var created = service.Create(request);
 
-        Assert.Equal(1, created.Id);
+        Assert.NotEqual(Guid.Empty, created.Id);
         Assert.Equal("Team Meeting", created.Title);
         Assert.Equal(request.StartAt, created.StartAt);
         Assert.Equal(request.EndAt, created.EndAt);
     }
 
     [Fact]
-    public void Create_AssignsIncrementalIds_ForMultipleEvents()
+    public void Create_AssignsUniqueIds_ForMultipleEvents()
     {
         var service = CreateService();
 
         var first = service.Create(BuildRequest("Event 1", DateTime.Parse("2026-08-01T10:00:00"), DateTime.Parse("2026-08-01T11:00:00")));
         var second = service.Create(BuildRequest("Event 2", DateTime.Parse("2026-08-02T10:00:00"), DateTime.Parse("2026-08-02T11:00:00")));
 
-        Assert.Equal(1, first.Id);
-        Assert.Equal(2, second.Id);
+        Assert.NotEqual(Guid.Empty, first.Id);
+        Assert.NotEqual(Guid.Empty, second.Id);
+        Assert.NotEqual(first.Id, second.Id);
     }
 
     [Fact]
@@ -98,7 +99,7 @@ public class EventServiceTests
     {
         var service = CreateService();
 
-        var found = service.GetById(999);
+        var found = service.GetById(Guid.NewGuid());
 
         Assert.Null(found);
     }
@@ -138,7 +139,7 @@ public class EventServiceTests
             EndAt = DateTime.Parse("2026-08-05T10:00:00")
         };
 
-        var result = service.Update(999, updateRequest);
+        var result = service.Update(Guid.NewGuid(), updateRequest);
 
         Assert.False(result);
     }
@@ -170,7 +171,7 @@ public class EventServiceTests
             EndAt = DateTime.Parse("2026-08-05T10:00:00")
         };
 
-        var result = service.Update(999, updateRequest);
+        var result = service.Update(Guid.NewGuid(), updateRequest);
 
         Assert.False(result);
     }
@@ -194,7 +195,7 @@ public class EventServiceTests
     {
         var service = CreateService();
 
-        var result = service.Delete(999);
+        var result = service.Delete(Guid.NewGuid());
 
         Assert.False(result);
     }
@@ -324,18 +325,15 @@ public class EventServiceTests
     }
 
     // 10. Получение события с несуществующим ID (дополнительный кейс)
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(999999)]
-    public void GetById_ReturnsNull_ForVariousNonExistentIds(int id)
+    [Fact]
+    public void GetById_ReturnsNull_ForVariousNonExistentIds()
     {
         var service = CreateService();
         service.Create(BuildRequest("Existing Event", DateTime.Parse("2026-08-01T10:00:00"), DateTime.Parse("2026-08-01T11:00:00")));
 
-        var found = service.GetById(id);
-
-        Assert.Null(found);
+        Assert.Null(service.GetById(Guid.Empty));
+        Assert.Null(service.GetById(Guid.NewGuid()));
+        Assert.Null(service.GetById(Guid.NewGuid()));
     }
 
     // 11. Обновление события с несуществующим ID (дополнительный кейс)
@@ -352,7 +350,7 @@ public class EventServiceTests
             EndAt = DateTime.Parse("2026-09-01T11:00:00")
         };
 
-        var result = service.Update(999, updateRequest);
+        var result = service.Update(Guid.NewGuid(), updateRequest);
         var unchanged = service.GetById(created.Id);
 
         Assert.False(result);

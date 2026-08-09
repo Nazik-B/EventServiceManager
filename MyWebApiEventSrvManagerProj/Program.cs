@@ -1,5 +1,6 @@
 using MyWebApiEventSrvManagerProj.Middleware;
 using EventsApi.Services;
+using MyWebApiEventSrvManagerProj.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddSingleton<IBookingService, BookingService>();
+builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 
 var app = builder.Build();
 

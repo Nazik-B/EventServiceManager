@@ -82,12 +82,6 @@ public class EventsController : ControllerBase
     [HttpPost("{id:guid}/book")]
     public async Task<IActionResult> Book(Guid id)
     {
-        var eventItem = _eventService.GetById(id);
-        if (eventItem is null)
-        {
-            throw new NotFoundException($"Event with id {id} was not found");
-        }
-
         var booking = await _bookingService.CreateBookingAsync(id);
 
         var response = new BookingResponse

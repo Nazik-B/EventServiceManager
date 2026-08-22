@@ -57,16 +57,16 @@ public class EventService : IEventService
     {
         ValidateDates(request.StartAt, request.EndAt);
 
-        var eventItem = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = request.Title,
-            Description = request.Description,
-            StartAt = request.StartAt!.Value,
-            EndAt = request.EndAt!.Value
-        };
+        var eventItem =  Event.Create(
+            Guid.NewGuid(),
+            request.Title,
+            request.Description,
+            request.StartAt!.Value,
+            request.EndAt!.Value,
+            request.TotalSeats!.Value);
 
         _events.Add(eventItem);
+
         return MapToResponse(eventItem);
     }
 
@@ -101,7 +101,9 @@ public class EventService : IEventService
         Title = e.Title,
         Description = e.Description,
         StartAt = e.StartAt,
-        EndAt = e.EndAt
+        EndAt = e.EndAt,
+        TotalSeats = e.TotalSeats,
+        AvailableSeats = e.AvailableSeats
     };
 
     private static void ValidateDates(DateTime? startAt, DateTime? endAt)

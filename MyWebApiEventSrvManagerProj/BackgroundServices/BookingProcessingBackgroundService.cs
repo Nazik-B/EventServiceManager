@@ -21,40 +21,44 @@ public class BookingProcessingBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("BookingProcessingBackgroundService started.");
-
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var pendingBookings = await _bookingService.GetPendingBookingsAsync();
+                var pendingBookings = await _bookingService.GetPendingBookingsAsync(stoppingToken);
 
                 foreach (var booking in pendingBookings)
                 {
-                    if (stoppingToken.IsCancellationRequested)
-                        break;
-
                     await ProcessBookingAsync(booking, stoppingToken);
                 }
+                await Task.Delay(PollingInterval, stoppingToken);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while processing pending bookings.");
-            }
-
-            await Task.Delay(PollingInterval, stoppingToken).ContinueWith(_ => { });
         }
-
-        _logger.LogInformation("BookingProcessingBackgroundService stopped.");
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Штатное завершение сервиса при остановке приложения.            
+        }            
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while processing pending bookings.");
+        }
+        finally
+        {
+            _logger.LogInformation("BookingProcessingBackgroundService stopped.");
+        }
     }
 
     private async Task ProcessBookingAsync(Booking booking, CancellationToken stoppingToken)
     {
         _logger.LogInformation("Processing booking {BookingId} for event {EventId}.", booking.Id, booking.EventId);
 
-        await Task.Delay(ProcessingDelay, stoppingToken).ContinueWith(_ => { });
+        await Task.Delay(ProcessingDelay, stoppingToken);
+
+        stoppingToken.ThrowIfCancellationRequested();
 
         var processedAt = DateTime.UtcNow;
-        await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt);
+        
+        await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt, stoppingToken);
 
         _logger.LogInformation(
             "Booking {BookingId} confirmed at {ProcessedAt}.", booking.Id, processedAt);

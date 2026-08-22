@@ -83,7 +83,7 @@ public class BookingServiceTests
         var created = await bookingService.CreateBookingAsync(createdEvent.Id);
         var processedAt = DateTime.UtcNow;
 
-        await bookingService.UpdateBookingStatusAsync(created.Id, finalStatus, processedAt);
+        await bookingService.UpdateBookingStatusAsync(created.Id, finalStatus, processedAt, CancellationToken.None);
         var updated = await bookingService.GetBookingByIdAsync(created.Id);
 
         Assert.NotNull(updated);

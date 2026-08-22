@@ -48,8 +48,10 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task<IEnumerable<Booking>> GetPendingBookingsAsync()
+    public Task<IEnumerable<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         lock (_lock)
         {
             var pending = _bookings.Where(b => b.Status == BookingStatus.Pending).ToList();
@@ -57,8 +59,10 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt)
+    public Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         lock (_lock)
         {
             var booking = _bookings.FirstOrDefault(b => b.Id == bookingId);

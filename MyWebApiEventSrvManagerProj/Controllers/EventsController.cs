@@ -10,10 +10,12 @@ namespace EventsApi.Controllers;
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
 
-    public EventsController(IEventService eventService)
+    public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
+        _bookingService = bookingService;
     }
 
     // GET /events?title=...&from=...&to=...&page=1&pageSize=10
@@ -30,8 +32,8 @@ public class EventsController : ControllerBase
     }
 
     // GET /events/{id}
-    [HttpGet("{id:int}")]
-    public ActionResult<EventResponse> GetById(int id)
+    [HttpGet("{id:guid}")]
+    public ActionResult<EventResponse> GetById(Guid id)
     {
         var eventItem = _eventService.GetById(id);
         if (eventItem is null)
@@ -51,8 +53,8 @@ public class EventsController : ControllerBase
     }
 
     // PUT /events/{id}
-    [HttpPut("{id:int}")]
-    public IActionResult Update(int id, [FromBody] UpdateEventRequest request)
+    [HttpPut("{id:guid}")]
+    public IActionResult Update(Guid id, [FromBody] UpdateEventRequest request)
     {
         var updated = _eventService.Update(id, request);
         if (!updated)
@@ -64,8 +66,8 @@ public class EventsController : ControllerBase
     }
 
     // DELETE /events/{id}
-    [HttpDelete("{id:int}")]
-    public IActionResult Delete(int id)
+    [HttpDelete("{id:guid}")]
+    public IActionResult Delete(Guid id)
     {
         var deleted = _eventService.Delete(id);
         if (!deleted)
@@ -76,11 +78,21 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
-        // GET /events/test-error — для тестирования middleware
-    /*[HttpGet("test-error")]
-    public IActionResult TestError()
+    // POST /events/{id}/book
+    [HttpPost("{id:guid}/book")]
+    public async Task<IActionResult> Book(Guid id)
     {
-        throw new InvalidOperationException("Тестовое исключение для проверки middleware");
+        var booking = await _bookingService.CreateBookingAsync(id);
+
+        var response = new BookingResponse
+        {
+            Id = booking.Id,
+            EventId = booking.EventId,
+            Status = booking.Status,
+            CreatedAt = booking.CreatedAt,
+            ProcessedAt = booking.ProcessedAt
+        };
+
+        return Accepted($"/bookings/{booking.Id}", response);
     }
-    */
 }

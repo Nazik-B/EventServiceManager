@@ -18,7 +18,7 @@ public class ExceptionHandlingMiddleware
     {
         _next = next;
         _logger = logger;
-    }  
+    }
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -61,10 +61,10 @@ public class ExceptionHandlingMiddleware
         var path = context.Request.Path;
         var traceId = context.TraceIdentifier;
 
-        if (statusCode >= 500  || statusCode == 409)
+        if (statusCode >= 500)
         {
             _logger.LogError(exception,
-                "Server-side or conflict error while processing {Method} {Path}. StatusCode: {StatusCode}, TraceId: {TraceId}",
+                "Server-side error while processing {Method} {Path}. StatusCode: {StatusCode}, TraceId: {TraceId}",
                 method, path, statusCode, traceId);
         }
         else if (statusCode >= 400)
@@ -80,7 +80,6 @@ public class ExceptionHandlingMiddleware
         400 => "5.1",
         401 => "5.2",
         404 => "5.5",
-        409 => "5.10",
         _ => "6.1"
     };
 }

@@ -1,5 +1,6 @@
 using EventsApi.Models;
 using EventsApi.Models.Dto;
+using System.ComponentModel.DataAnnotations;
 
 namespace EventsApi.Services;
 
@@ -44,9 +45,9 @@ public class EventService : IEventService
             Page = page,
             PageSize = pageSize
         };
-    }       
+    }
 
-    public EventResponse? GetById(int id)
+    public EventResponse? GetById(Guid id)
     {
         var existing = _events.FirstOrDefault(e => e.Id == id);
         return existing is null ? null : MapToResponse(existing);
@@ -54,9 +55,11 @@ public class EventService : IEventService
 
     public EventResponse Create(CreateEventRequest request)
     {
+        ValidateDates(request.StartAt, request.EndAt);
+
         var eventItem = new Event
         {
-            Id = _events.Count == 0 ? 1 : _events.Max(e => e.Id) + 1,
+            Id = Guid.NewGuid(),
             Title = request.Title,
             Description = request.Description,
             StartAt = request.StartAt!.Value,
@@ -67,11 +70,13 @@ public class EventService : IEventService
         return MapToResponse(eventItem);
     }
 
-    public bool Update(int id, UpdateEventRequest request)
+    public bool Update(Guid id, UpdateEventRequest request)
     {
         var existing = _events.FirstOrDefault(e => e.Id == id);
         if (existing is null)
             return false;
+
+        ValidateDates(request.StartAt, request.EndAt);
 
         existing.Title = request.Title;
         existing.Description = request.Description;
@@ -80,7 +85,7 @@ public class EventService : IEventService
         return true;
     }
 
-    public bool Delete(int id)
+    public bool Delete(Guid id)
     {
         var existing = _events.FirstOrDefault(e => e.Id == id);
         if (existing is null)
@@ -98,4 +103,12 @@ public class EventService : IEventService
         StartAt = e.StartAt,
         EndAt = e.EndAt
     };
+
+    private static void ValidateDates(DateTime? startAt, DateTime? endAt)
+    {
+        if (startAt.HasValue && endAt.HasValue && endAt <= startAt)
+        {
+            throw new ValidationException("EndAt must be later than StartAt");
+        }
+    }
 }

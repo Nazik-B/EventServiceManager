@@ -61,11 +61,20 @@ public class BookingProcessingBackgroundService : BackgroundService
 
         stoppingToken.ThrowIfCancellationRequested();
 
-        var processedAt = DateTime.UtcNow;
-        
-        await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt, stoppingToken);
+        await _processingSemaphore.WaitAsync(stoppingToken);
 
-        _logger.LogInformation(
+        try
+        {
+            var processedAt = DateTime.UtcNow;
+
+            await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt, stoppingToken);
+
+            _logger.LogInformation(
             "Booking {BookingId} confirmed at {ProcessedAt}.", booking.Id, processedAt);
+        }
+        finally
+        {
+            _processingSemaphore.Release();
+        }  
     }
 }

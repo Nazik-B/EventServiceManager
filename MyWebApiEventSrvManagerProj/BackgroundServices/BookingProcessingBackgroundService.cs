@@ -7,14 +7,18 @@ public class BookingProcessingBackgroundService : BackgroundService
 {
     private readonly IBookingService _bookingService;
     private readonly ILogger<BookingProcessingBackgroundService> _logger;
+    private readonly IEventService _eventService;
+    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ProcessingDelay = TimeSpan.FromSeconds(2);
 
     public BookingProcessingBackgroundService(
         IBookingService bookingService,
+        IEventService eventService,
         ILogger<BookingProcessingBackgroundService> logger)
     {
         _bookingService = bookingService;
+        _eventService = eventService;
         _logger = logger;
     }
 

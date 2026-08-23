@@ -27,10 +27,11 @@ public class BookingProcessingBackgroundService : BackgroundService
             {
                 var pendingBookings = await _bookingService.GetPendingBookingsAsync(stoppingToken);
 
-                foreach (var booking in pendingBookings)
-                {
-                    await ProcessBookingAsync(booking, stoppingToken);
-                }
+                var tasks = pendingBookings
+                .Select(booking => ProcessBookingAsync(booking, stoppingToken));
+
+                await Task.WhenAll(tasks);
+
                 await Task.Delay(PollingInterval, stoppingToken);
             }
         }

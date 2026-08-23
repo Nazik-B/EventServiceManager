@@ -11,4 +11,5 @@ public interface IEventService
     bool Update(Guid id, UpdateEventRequest request);
     bool Delete(Guid id);
     bool TryReserveSeat(Guid eventId);
+    bool ReleaseSeat(Guid eventId);
 }

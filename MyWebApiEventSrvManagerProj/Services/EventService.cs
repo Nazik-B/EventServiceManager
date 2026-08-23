@@ -128,4 +128,17 @@ public class EventService : IEventService
 
         return eventItem.TryReserveSeats();
     }
+    public bool ReleaseSeat(Guid eventId)
+    {
+        var eventItem = _events.FirstOrDefault(e => e.Id == eventId);
+
+        if (eventItem is null)
+        {
+            return false;
+        }
+
+        eventItem.ReleaseSeats();
+
+        return true;
+    }
 }

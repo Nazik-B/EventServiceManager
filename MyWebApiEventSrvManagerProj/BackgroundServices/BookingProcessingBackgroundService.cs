@@ -57,14 +57,17 @@ public class BookingProcessingBackgroundService : BackgroundService
     {
         _logger.LogInformation("Processing booking {BookingId} for event {EventId}.", booking.Id, booking.EventId);
 
-        await Task.Delay(ProcessingDelay, stoppingToken);
-
-        stoppingToken.ThrowIfCancellationRequested();
-
-        await _processingSemaphore.WaitAsync(stoppingToken);
-
+        var semaphoreEntered = false;
         try
         {
+            await Task.Delay(ProcessingDelay, stoppingToken);
+
+            stoppingToken.ThrowIfCancellationRequested();
+
+            await _processingSemaphore.WaitAsync(stoppingToken);
+
+            semaphoreEntered = true;
+        
             var processedAt = DateTime.UtcNow;
 
             await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt, stoppingToken);
@@ -72,9 +75,43 @@ public class BookingProcessingBackgroundService : BackgroundService
             _logger.LogInformation(
             "Booking {BookingId} confirmed at {ProcessedAt}.", booking.Id, processedAt);
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Processing of booking {BookingId} was cancelled.",
+                booking.Id);
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Unexpected error while processing booking {BookingId}.",
+                booking.Id);
+
+                if (!semaphoreEntered)
+                {
+                    await _processingSemaphore.WaitAsync(CancellationToken.None);
+                    semaphoreEntered = true;
+                }
+
+            var processedAt = DateTime.UtcNow;
+
+            await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Rejected, processedAt, CancellationToken.None);
+
+            _eventService.ReleaseSeat(booking.EventId);
+
+            _logger.LogWarning(
+                "Booking {BookingId} was rejected and a seat was released.",
+                booking.Id);
+        }
         finally
         {
-            _processingSemaphore.Release();
-        }  
+            if (semaphoreEntered)
+            {
+                _processingSemaphore.Release();
+            }  
+        }
     }
 }

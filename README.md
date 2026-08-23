@@ -47,6 +47,20 @@ dotnet run
 - `EndAt` должен быть строго позже `StartAt`, иначе API вернёт `400 Bad Request` с описанием ошибки в поле `EndAt` ("EndAt must be later than StartAt").
 - При создании и обновлении используются отдельные DTO (`CreateEventRequest`, `UpdateEventRequest`), клиент не может передавать `Id` вручную — идентификатор генерируется сервисом автоматически.
 - При создании брони (`POST /events/{id}/book`) `BookingService` проверяет существование события через `IEventService`; если событие не найдено, запрос завершается ошибкой `404 Not Found` до создания брони.
+- `TotalSeats` — обязательное поле; должно быть больше 0.
+- `AvailableSeats` клиент не передаёт: сервис вычисляет его автоматически.
+
+## Модель Event
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `Guid` | Уникальный идентификатор события. |
+| `title` | `string` | Название события. |
+| `description` | `string?` | Необязательное описание. |
+| `startAt` | `DateTime` | Время начала события. |
+| `endAt` | `DateTime` | Время окончания события. |
+| `totalSeats` | `int` | Общая вместимость события. Обязательное значение больше 0. |
+| `availableSeats` | `int` | Текущее число свободных мест. При создании равно `totalSeats`; уменьшается после успешной брони и увеличивается при возврате места. |
 
 ## Эндпоинты API
 
@@ -64,10 +78,11 @@ dotnet run
 
 | Метод  | URL                     | Описание                                   | Успех          | Ошибка         |
 |--------|-------------------------|---------------------------------------------|----------------|----------------|
-| POST   | /events/{id}/book       | Создать бронь на указанное событие          | 202 Accepted   | 404 Not Found  |
+| POST   | /events/{id}/book       | Создать бронь на указанное событие          | 202 Accepted   | 404 Not Found, 409 Conflict   |
 | GET    | /bookings/{id}          | Получить текущий статус брони по id         | 200 OK         | 404 Not Found  |
 
 `POST /events/{id}/book` возвращает заголовок `Location`, указывающий на `/bookings/{bookingId}` для отслеживания статуса созданной брони.
+`POST /events/{id}/book` возвращает `409 Conflict`, если событие существует, но свободных мест больше нет. Ошибка соответствует `NoAvailableSeatsException`.
 
 ## GET /events — параметры фильтрации и пагинации
 
@@ -122,6 +137,14 @@ dotnet run
 - **`Pending`** — бронь создана и ожидает обработки в фоновой очереди. Начальный статус для любой новой брони.
 - **`Confirmed`** — бронь успешно обработана и подтверждена.
 
+## Синхронизация и конкурентность
+
+Сервис использует два примитива синхронизации для корректной работы при одновременных запросах.
+
+- `lock` в `BookingService` защищает создание брони, резервирование места и добавление брони в in-memory хранилище как единую операцию. Это предотвращает овербукинг: несколько конкурентных запросов не смогут занять больше мест, чем указано в `TotalSeats`.
+- `SemaphoreSlim` в `BookingProcessingBackgroundService` защищает асинхронное обновление статусов брони и хранилища во время фоновой обработки. В отличие от `lock`, `SemaphoreSlim` можно использовать вместе с `await`.
+- Задержка `Task.Delay` в фоновой обработке выполняется до захвата семафора, поэтому имитация внешних вызовов для нескольких броней идёт параллельно, а критическая секция обновления хранилища остаётся защищённой.
+
 ## Логика фоновой обработки бронирований
 
 Создание брони через `POST /events/{id}/book` не выполняет обработку синхронно:
@@ -141,7 +164,7 @@ dotnet run
 ```bash
 curl -X POST http://localhost:5102/events \\
   -H "Content-Type: application/json" \\
-  -d '{"title":"Standup","description":"Daily meeting","startAt":"2026-07-09T10:00:00","endAt":"2026-07-09T10:15:00"}'
+  -d '{"title":"Standup","description":"Daily meeting","startAt":"2026-07-09T10:00:00","endAt":"2026-07-09T10:15:00","totalSeats":10}'
 ```
 
 ### Получение списка событий
@@ -192,7 +215,7 @@ curl -X DELETE http://localhost:5102/events/1
 # 1. Создать событие
 curl -i -X POST http://localhost:5102/events \
   -H "Content-Type: application/json" \
-  -d '{"title":"Final Check","startAt":"2026-08-10T10:00:00","endAt":"2026-08-10T11:00:00"}'
+  -d '{"title":"Final Check","startAt":"2026-08-10T10:00:00","endAt":"2026-08-10T11:00:00","totalSeats": 3}'
 # → 201 Created, тело содержит "id" события (EVENT_ID)
 
 # 2. Создать бронь на это событие
@@ -207,9 +230,21 @@ curl -i http://localhost:5102/bookings/BOOKING_ID
 sleep 10
 curl -i http://localhost:5102/bookings/BOOKING_ID
 # → 200 OK, status: "Confirmed", processedAt заполнен
-\`\`\`
 
+# 5. Четвёртая бронь отклоняется
+
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+# → 202 Accepted
+
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+# → 202 Accepted
+
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+# → 409 Conflict
+\`\`\`
 Тот же сценарий можно выполнить через Swagger UI (`/swagger`): последовательно вызвать `POST /events`, `POST /events/{id}/book` и несколько раз `GET /bookings/{id}` с задержкой, наблюдая переход статуса из `Pending` в `Confirmed`.
+
+После трёх успешных броней `availableSeats` равен `0`. Четвёртый запрос не создаёт бронь и возвращает `409 Conflict`, что предотвращает овербукинг.
 
 ## Формат ответа при ошибках
 

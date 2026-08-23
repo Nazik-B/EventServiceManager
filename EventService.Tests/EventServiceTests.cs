@@ -15,7 +15,8 @@ public class EventServiceTests
             Title = title,
             Description = description,
             StartAt = start,
-            EndAt = end
+            EndAt = end,
+            TotalSeats = 10
         };
 
     // 1. Создание события
@@ -365,7 +366,8 @@ public class EventServiceTests
         {
             Title = "",
             StartAt = DateTime.Parse("2026-08-01T10:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T11:00:00")
+            EndAt = DateTime.Parse("2026-08-01T11:00:00"),
+            TotalSeats = 10
         };
 
         var validationResults = ValidateModel(request);
@@ -381,7 +383,8 @@ public class EventServiceTests
         {
             Title = "Valid Title",
             StartAt = null,
-            EndAt = DateTime.Parse("2026-08-01T11:00:00")
+            EndAt = DateTime.Parse("2026-08-01T11:00:00"),
+            TotalSeats = 10
         };
 
         var validationResults = ValidateModel(request);
@@ -413,7 +416,8 @@ public class EventServiceTests
         {
             Title = "Invalid Dates",
             StartAt = DateTime.Parse("2026-08-01T12:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T10:00:00")
+            EndAt = DateTime.Parse("2026-08-01T10:00:00"),
+            TotalSeats = 10
         };
 
         var validationResults = ValidateModel(request);
@@ -428,7 +432,8 @@ public class EventServiceTests
         {
             Title = "Valid Event",
             StartAt = DateTime.Parse("2026-08-01T10:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T12:00:00")
+            EndAt = DateTime.Parse("2026-08-01T12:00:00"),
+            TotalSeats = 10
         };
 
         var validationResults = ValidateModel(request);

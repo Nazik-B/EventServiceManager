@@ -15,12 +15,13 @@ public class BookingServiceTests
         return (bookingService, eventService);
     }
 
-    private static CreateEventRequest BuildEventRequest(string title = "Team Meeting") =>
+    private static CreateEventRequest BuildEventRequest(string title = "Team Meeting", int totalSeats = 3) =>
         new()
         {
             Title = title,
             StartAt = DateTime.Parse("2026-08-01T10:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T11:00:00")
+            EndAt = DateTime.Parse("2026-08-01T11:00:00"),
+            TotalSeats = totalSeats
         };
 
     // Успешные сценарии
@@ -83,12 +84,58 @@ public class BookingServiceTests
         var created = await bookingService.CreateBookingAsync(createdEvent.Id);
         var processedAt = DateTime.UtcNow;
 
-        await bookingService.UpdateBookingStatusAsync(created.Id, finalStatus, processedAt);
+        await bookingService.UpdateBookingStatusAsync(created.Id, finalStatus, processedAt, CancellationToken.None);
         var updated = await bookingService.GetBookingByIdAsync(created.Id);
 
         Assert.NotNull(updated);
         Assert.Equal(finalStatus, updated!.Status);
         Assert.Equal(processedAt, updated.ProcessedAt);
+    }
+
+       // Новая логика мест
+
+    [Fact]
+    public async Task CreateBookingAsync_DecreasesAvailableSeatsByOne()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 3));
+
+        await bookingService.CreateBookingAsync(createdEvent.Id);
+
+        var updatedEvent = eventService.GetById(createdEvent.Id);
+
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(2, updatedEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_CreatesBookingsWithUniqueIds_UntilSeatLimit()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 3));
+
+        var first = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var second = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var third = await bookingService.CreateBookingAsync(createdEvent.Id);
+
+        var bookingIds = new[] { first.Id, second.Id, third.Id };
+        var updatedEvent = eventService.GetById(createdEvent.Id);
+
+        Assert.Equal(3, bookingIds.Distinct().Count());
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(0, updatedEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_ThrowsNoAvailableSeatsException_WhenSeatsAreExhausted()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 1));
+
+        await bookingService.CreateBookingAsync(createdEvent.Id);
+
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(
+            () => bookingService.CreateBookingAsync(createdEvent.Id));
     }
 
     // Неуспешные сценарии

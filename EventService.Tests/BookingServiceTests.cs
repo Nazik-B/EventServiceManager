@@ -260,4 +260,50 @@ public class BookingServiceTests
         Assert.NotNull(updatedEvent);
         Assert.Equal(0, updatedEvent.AvailableSeats);
     }
+
+    // Конкурентность
+
+    [Fact]
+    public async Task CreateBookingAsync_DoesNotAllowOverbooking_WhenRequestsAreConcurrent()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 5));
+
+        var tasks = Enumerable.Range(0, 20)
+            .Select(_ => Task.Run(async () =>
+            {
+                try
+                {
+                    var booking = await bookingService.CreateBookingAsync(createdEvent.Id);
+                    return (Booking: booking, Exception: (Exception?)null);
+                }
+                catch (Exception ex)
+                {
+                    return (Booking: (Booking?)null, Exception: ex);
+                }
+            }))
+            .ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        var successfulBookings = results
+            .Where(result => result.Booking is not null)
+            .Select(result => result.Booking!)
+            .ToList();
+
+        var exceptions = results
+            .Where(result => result.Exception is not null)
+            .Select(result => result.Exception!)
+            .ToList();
+
+        var updatedEvent = eventService.GetById(createdEvent.Id);
+
+        Assert.Equal(5, successfulBookings.Count);
+        Assert.Equal(15, exceptions.Count);
+        Assert.All(exceptions, exception =>
+            Assert.IsType<NoAvailableSeatsException>(exception));
+
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(0, updatedEvent.AvailableSeats);
+    }
 }

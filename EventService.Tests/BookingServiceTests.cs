@@ -172,4 +172,92 @@ public class BookingServiceTests
 
         Assert.Null(found);
     }
+    // Смена статуса брони
+
+    [Fact]
+    public async Task UpdateBookingStatusAsync_SetsConfirmedStatusAndProcessedAt()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest());
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var processedAt = DateTime.UtcNow;
+
+        await bookingService.UpdateBookingStatusAsync(
+            booking.Id,
+            BookingStatus.Confirmed,
+            processedAt,
+            CancellationToken.None);
+
+        var updatedBooking = await bookingService.GetBookingByIdAsync(booking.Id);
+
+        Assert.NotNull(updatedBooking);
+        Assert.Equal(BookingStatus.Confirmed, updatedBooking!.Status);
+        Assert.Equal(processedAt, updatedBooking.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task UpdateBookingStatusAsync_SetsRejectedStatusAndProcessedAt()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest());
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var processedAt = DateTime.UtcNow;
+
+        await bookingService.UpdateBookingStatusAsync(
+            booking.Id,
+            BookingStatus.Rejected,
+            processedAt,
+            CancellationToken.None);
+
+        var updatedBooking = await bookingService.GetBookingByIdAsync(booking.Id);
+
+        Assert.NotNull(updatedBooking);
+        Assert.Equal(BookingStatus.Rejected, updatedBooking!.Status);
+        Assert.Equal(processedAt, updatedBooking.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task RejectAndReleaseSeat_RestoresAvailableSeats()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 1));
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id);
+
+        await bookingService.UpdateBookingStatusAsync(
+            booking.Id,
+            BookingStatus.Rejected,
+            DateTime.UtcNow,
+            CancellationToken.None);
+
+        var released = eventService.ReleaseSeat(createdEvent.Id);
+        var updatedEvent = eventService.GetById(createdEvent.Id);
+
+        Assert.True(released);
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(1, updatedEvent.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task RejectAndReleaseSeat_AllowsCreatingNewBooking()
+    {
+        var (bookingService, eventService) = CreateServices();
+        var createdEvent = eventService.Create(BuildEventRequest(totalSeats: 1));
+        var rejectedBooking = await bookingService.CreateBookingAsync(createdEvent.Id);
+
+        await bookingService.UpdateBookingStatusAsync(
+            rejectedBooking.Id,
+            BookingStatus.Rejected,
+            DateTime.UtcNow,
+            CancellationToken.None);
+
+        eventService.ReleaseSeat(createdEvent.Id);
+
+        var newBooking = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var updatedEvent = eventService.GetById(createdEvent.Id);
+
+        Assert.NotEqual(rejectedBooking.Id, newBooking.Id);
+        Assert.Equal(BookingStatus.Pending, newBooking.Status);
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(0, updatedEvent.AvailableSeats);
+    }
 }

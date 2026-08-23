@@ -69,6 +69,19 @@ public class BookingProcessingBackgroundService : BackgroundService
             semaphoreEntered = true;
         
             var processedAt = DateTime.UtcNow;
+            var eventItem = _eventService.GetById(booking.EventId);
+
+            if (eventItem is null)
+            {
+                await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Rejected, processedAt, stoppingToken);
+
+                _logger.LogWarning(
+                    "Booking {BookingId} was rejected because event {EventId} was not found.",
+                    booking.Id,
+                    booking.EventId);
+
+                return;
+            }
 
             await _bookingService.UpdateBookingStatusAsync(booking.Id, BookingStatus.Confirmed, processedAt, stoppingToken);
 

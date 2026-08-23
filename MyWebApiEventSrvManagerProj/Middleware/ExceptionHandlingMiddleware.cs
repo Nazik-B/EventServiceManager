@@ -80,6 +80,7 @@ public class ExceptionHandlingMiddleware
         400 => "5.1",
         401 => "5.2",
         404 => "5.5",
+        409 => "5.8",
         _ => "6.1"
     };
 }

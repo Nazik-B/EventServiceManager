@@ -1,6 +1,7 @@
 using EventsApi.Models;
 using EventsApi.Models.Dto;
 using System.ComponentModel.DataAnnotations;
+using MyWebApiEventSrvManagerProj.Exceptions;
 
 namespace EventsApi.Services;
 
@@ -112,5 +113,19 @@ public class EventService : IEventService
         {
             throw new ValidationException("EndAt must be later than StartAt");
         }
+    }
+
+    public bool TryReserveSeat(Guid eventId)
+    {
+        var eventItem = _events.FirstOrDefault(
+            e => e.Id == eventId);
+
+        if (eventItem is null)
+        {
+            throw new NotFoundException(
+                $"Event with id {eventId} was not found");
+        }
+
+        return eventItem.TryReserveSeats();
     }
 }

@@ -80,6 +80,7 @@ public class EventsController : ControllerBase
 
     // POST /events/{id}/book
     [HttpPost("{id:guid}/book")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Book(Guid id)
     {
         var booking = await _bookingService.CreateBookingAsync(id);

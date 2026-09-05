@@ -1,25 +1,14 @@
-using MyWebApiEventSrvManagerProj.Middleware;
 using EventsApi.Services;
-using MyWebApiEventSrvManagerProj.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    });
-
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IEventService, EventService>();
-builder.Services.AddSingleton<IBookingService, BookingService>();
-builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 
 var app = builder.Build();
-
-app.UseGlobalExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {

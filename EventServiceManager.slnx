@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="EventService.Tests/EventService.Tests.csproj" />
-  <Project Path="MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj" />
-</Solution>

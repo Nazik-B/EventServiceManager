@@ -4,7 +4,6 @@ using MyWebApiEventSrvManagerProj.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

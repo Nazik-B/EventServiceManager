@@ -7,6 +7,7 @@ public class BookingService : IBookingService
 {
     private readonly IEventService _eventService;
     private readonly List<Booking> _bookings = new();
+    private readonly object _bookingLock = new(); 
     private readonly object _lock = new();
 
     public BookingService(IEventService eventService)
@@ -16,27 +17,34 @@ public class BookingService : IBookingService
 
     public Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        var eventItem = _eventService.GetById(eventId);
-        if (eventItem is null)
+        lock (_bookingLock)
         {
-            throw new NotFoundException($"Event with id {eventId} was not found");
+            var eventItem = _eventService.GetById(eventId);
+            if (eventItem is null)
+            {
+                throw new NotFoundException($"Event with id {eventId} was not found");
+            }
+
+            var reserved = _eventService.TryReserveSeat(eventId);
+
+            if (!reserved)
+            {
+                throw new NoAvailableSeatsException();
+            }
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Status = BookingStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                ProcessedAt = null
+            };
+
+           _bookings.Add(booking);
+
+            return Task.FromResult(booking);
         }
-
-        var booking = new Booking
-        {
-            Id = Guid.NewGuid(),
-            EventId = eventId,
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            ProcessedAt = null
-        };
-
-        lock (_lock)
-        {
-            _bookings.Add(booking);
-        }
-
-        return Task.FromResult(booking);
     }
 
     public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
@@ -48,8 +56,10 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task<IEnumerable<Booking>> GetPendingBookingsAsync()
+    public Task<IEnumerable<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         lock (_lock)
         {
             var pending = _bookings.Where(b => b.Status == BookingStatus.Pending).ToList();
@@ -57,8 +67,10 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt)
+    public Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         lock (_lock)
         {
             var booking = _bookings.FirstOrDefault(b => b.Id == bookingId);

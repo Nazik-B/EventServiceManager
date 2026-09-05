@@ -1,6 +1,7 @@
 using EventsApi.Models;
 using EventsApi.Models.Dto;
 using System.ComponentModel.DataAnnotations;
+using MyWebApiEventSrvManagerProj.Exceptions;
 
 namespace EventsApi.Services;
 
@@ -57,16 +58,16 @@ public class EventService : IEventService
     {
         ValidateDates(request.StartAt, request.EndAt);
 
-        var eventItem = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = request.Title,
-            Description = request.Description,
-            StartAt = request.StartAt!.Value,
-            EndAt = request.EndAt!.Value
-        };
+        var eventItem =  Event.Create(
+            Guid.NewGuid(),
+            request.Title,
+            request.Description,
+            request.StartAt!.Value,
+            request.EndAt!.Value,
+            request.TotalSeats!.Value);
 
         _events.Add(eventItem);
+
         return MapToResponse(eventItem);
     }
 
@@ -101,7 +102,9 @@ public class EventService : IEventService
         Title = e.Title,
         Description = e.Description,
         StartAt = e.StartAt,
-        EndAt = e.EndAt
+        EndAt = e.EndAt,
+        TotalSeats = e.TotalSeats,
+        AvailableSeats = e.AvailableSeats
     };
 
     private static void ValidateDates(DateTime? startAt, DateTime? endAt)
@@ -110,5 +113,32 @@ public class EventService : IEventService
         {
             throw new ValidationException("EndAt must be later than StartAt");
         }
+    }
+
+    public bool TryReserveSeat(Guid eventId)
+    {
+        var eventItem = _events.FirstOrDefault(
+            e => e.Id == eventId);
+
+        if (eventItem is null)
+        {
+            throw new NotFoundException(
+                $"Event with id {eventId} was not found");
+        }
+
+        return eventItem.TryReserveSeats();
+    }
+    public bool ReleaseSeat(Guid eventId)
+    {
+        var eventItem = _events.FirstOrDefault(e => e.Id == eventId);
+
+        if (eventItem is null)
+        {
+            return false;
+        }
+
+        eventItem.ReleaseSeats();
+
+        return true;
     }
 }

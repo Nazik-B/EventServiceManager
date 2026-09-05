@@ -10,4 +10,6 @@ public interface IEventService
     EventResponse Create(CreateEventRequest request);
     bool Update(Guid id, UpdateEventRequest request);
     bool Delete(Guid id);
+    bool TryReserveSeat(Guid eventId);
+    bool ReleaseSeat(Guid eventId);
 }

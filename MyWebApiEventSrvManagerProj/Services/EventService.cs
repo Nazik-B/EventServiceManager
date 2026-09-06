@@ -1,24 +1,32 @@
 using EventsApi.Models;
 using EventsApi.Models.Dto;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using MyWebApiEventSrvManagerProj.Exceptions;
+using EventsApi.DataAccess;
+using System.Threading;
 
 namespace EventsApi.Services;
 
 public class EventService : IEventService
 {
-    private readonly List<Event> _events = new();
+    private readonly AppDbContext _context;
 
-    public PaginatedResult<EventResponse> GetAll(string? title, DateTime? from, DateTime? to, int page, int pageSize)
+    public EventService(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<PaginatedResult<EventResponse>> GetAllAsync(string? title, DateTime? from, DateTime? to, int page, int pageSize)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 10;
 
-        var query = _events.AsEnumerable();
+        IQueryable<Event> query = _context.Events.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(title))
         {
-            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+           query = query.Where(e => e.Title.Contains(title));
         }
 
         if (from.HasValue)
@@ -31,13 +39,22 @@ public class EventService : IEventService
             query = query.Where(e => e.EndAt <= to.Value);
         }
 
-        var totalCount = query.Count();
+        var totalCount = await query.CountAsync();
 
-        var items = query
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(MapToResponse)
-            .ToList();
+            .Select(e => new EventResponse
+            {
+                Id = e.Id,
+                Title = e.Title,
+                Description = e.Description,
+                StartAt = e.StartAt,
+                EndAt = e.EndAt,
+                TotalSeats = e.TotalSeats,
+                AvailableSeats = e.AvailableSeats
+            })
+            .ToListAsync();
 
         return new PaginatedResult<EventResponse>
         {
@@ -47,14 +64,15 @@ public class EventService : IEventService
             PageSize = pageSize
         };
     }
-
-    public EventResponse? GetById(Guid id)
+    public async Task<EventResponse?> GetByIdAsync(Guid id)
     {
-        var existing = _events.FirstOrDefault(e => e.Id == id);
-        return existing is null ? null : MapToResponse(existing);
-    }
+        var eventItem = await _context.Events
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
 
-    public EventResponse Create(CreateEventRequest request)
+        return eventItem is null ? null : MapToResponse(eventItem);
+    }
+    public async Task<EventResponse> CreateAsync(CreateEventRequest request)
     {
         ValidateDates(request.StartAt, request.EndAt);
 
@@ -66,14 +84,16 @@ public class EventService : IEventService
             request.EndAt!.Value,
             request.TotalSeats!.Value);
 
-        _events.Add(eventItem);
+        _context.Events.Add(eventItem);
+
+        await _context.SaveChangesAsync();
 
         return MapToResponse(eventItem);
     }
 
-    public bool Update(Guid id, UpdateEventRequest request)
+    public async Task<bool> UpdateAsync(Guid id, UpdateEventRequest request)
     {
-        var existing = _events.FirstOrDefault(e => e.Id == id);
+        var existing = await _context.Events.FindAsync(id);
         if (existing is null)
             return false;
 
@@ -83,28 +103,32 @@ public class EventService : IEventService
         existing.Description = request.Description;
         existing.StartAt = request.StartAt!.Value;
         existing.EndAt = request.EndAt!.Value;
+
+        await _context.SaveChangesAsync();
         return true;
     }
 
-    public bool Delete(Guid id)
+    public async Task<bool> DeleteAsync(Guid id)
     {
-        var existing = _events.FirstOrDefault(e => e.Id == id);
+        var existing = await _context.Events.FindAsync(id);
         if (existing is null)
             return false;
 
-        _events.Remove(existing);
+        _context.Events.Remove(existing);
+
+        await _context.SaveChangesAsync();
         return true;
     }
 
-    private static EventResponse MapToResponse(Event e) => new()
+    private static EventResponse MapToResponse(Event eventItem) => new()
     {
-        Id = e.Id,
-        Title = e.Title,
-        Description = e.Description,
-        StartAt = e.StartAt,
-        EndAt = e.EndAt,
-        TotalSeats = e.TotalSeats,
-        AvailableSeats = e.AvailableSeats
+        Id = eventItem.Id,
+        Title = eventItem.Title,
+        Description = eventItem.Description,
+        StartAt = eventItem.StartAt,
+        EndAt = eventItem.EndAt,
+        TotalSeats = eventItem.TotalSeats,
+        AvailableSeats = eventItem.AvailableSeats
     };
 
     private static void ValidateDates(DateTime? startAt, DateTime? endAt)
@@ -115,10 +139,9 @@ public class EventService : IEventService
         }
     }
 
-    public bool TryReserveSeat(Guid eventId)
+    public async Task<bool> TryReserveSeatAsync(Guid eventId)
     {
-        var eventItem = _events.FirstOrDefault(
-            e => e.Id == eventId);
+        var eventItem = await _context.Events.FindAsync(eventId);
 
         if (eventItem is null)
         {
@@ -126,11 +149,18 @@ public class EventService : IEventService
                 $"Event with id {eventId} was not found");
         }
 
-        return eventItem.TryReserveSeats();
+        var reserved = eventItem.TryReserveSeats();
+
+        if (reserved)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return reserved;
     }
-    public bool ReleaseSeat(Guid eventId)
+    public async Task<bool> ReleaseSeatAsync(Guid eventId)
     {
-        var eventItem = _events.FirstOrDefault(e => e.Id == eventId);
+        var eventItem = await _context.Events.FindAsync(eventId);
 
         if (eventItem is null)
         {
@@ -138,6 +168,8 @@ public class EventService : IEventService
         }
 
         eventItem.ReleaseSeats();
+
+        await _context.SaveChangesAsync();
 
         return true;
     }

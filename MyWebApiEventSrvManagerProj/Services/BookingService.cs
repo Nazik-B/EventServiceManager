@@ -1,31 +1,37 @@
+using EventsApi.DataAccess;
 using EventsApi.Models;
+using Microsoft.EntityFrameworkCore;
 using MyWebApiEventSrvManagerProj.Exceptions;
 
 namespace EventsApi.Services;
 
 public class BookingService : IBookingService
 {
-    private readonly IEventService _eventService;
-    private readonly List<Booking> _bookings = new();
-    private readonly object _bookingLock = new(); 
-    private readonly object _lock = new();
+    private static readonly SemaphoreSlim BookingSemaphore = new(1, 1);
 
-    public BookingService(IEventService eventService)
+    private readonly AppDbContext _context;
+
+    public BookingService(AppDbContext context)
     {
-        _eventService = eventService;
+        _context = context;
     }
 
-    public Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        lock (_bookingLock)
+        await BookingSemaphore.WaitAsync();
+
+        try
         {
-            var eventItem = _eventService.GetById(eventId);
+            var eventItem = await _context.Events
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
             if (eventItem is null)
             {
-                throw new NotFoundException($"Event with id {eventId} was not found");
+                throw new NotFoundException(
+                    $"Event with id {eventId} was not found");
             }
 
-            var reserved = _eventService.TryReserveSeat(eventId);
+            var reserved = eventItem.TryReserveSeats();
 
             if (!reserved)
             {
@@ -41,46 +47,53 @@ public class BookingService : IBookingService
                 ProcessedAt = null
             };
 
-           _bookings.Add(booking);
+            _context.Bookings.Add(booking);
 
-            return Task.FromResult(booking);
+            await _context.SaveChangesAsync();
+
+            return booking;
+        }
+        finally
+        {
+            BookingSemaphore.Release();
         }
     }
 
-    public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
     {
-        lock (_lock)
-        {
-            var booking = _bookings.FirstOrDefault(b => b.Id == bookingId);
-            return Task.FromResult(booking);
-        }
+        return await _context.Bookings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == bookingId);
     }
 
-    public Task<IEnumerable<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken)
+    public async Task<IEnumerable<Booking>> GetPendingBookingsAsync(
+        CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_lock)
-        {
-            var pending = _bookings.Where(b => b.Status == BookingStatus.Pending).ToList();
-            return Task.FromResult<IEnumerable<Booking>>(pending);
-        }
+        return await _context.Bookings
+            .AsNoTracking()
+            .Where(b => b.Status == BookingStatus.Pending)
+            .ToListAsync(cancellationToken);
     }
 
-    public Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt, CancellationToken cancellationToken)
+    public async Task UpdateBookingStatusAsync(
+        Guid bookingId,
+        BookingStatus status,
+        DateTime processedAt,
+        CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        
-        lock (_lock)
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(
+                b => b.Id == bookingId,
+                cancellationToken);
+
+        if (booking is null)
         {
-            var booking = _bookings.FirstOrDefault(b => b.Id == bookingId);
-            if (booking is not null)
-            {
-                booking.Status = status;
-                booking.ProcessedAt = processedAt;
-            }
+            return;
         }
 
-        return Task.CompletedTask;
+        booking.Status = status;
+        booking.ProcessedAt = processedAt;
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

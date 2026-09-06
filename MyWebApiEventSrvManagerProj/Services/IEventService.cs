@@ -1,15 +1,25 @@
-using EventsApi.Models;
 using EventsApi.Models.Dto;
 
 namespace EventsApi.Services;
 
 public interface IEventService
 {
-    PaginatedResult<EventResponse> GetAll(string? title, DateTime? from, DateTime? to, int page, int pageSize);
-    EventResponse? GetById(Guid id);
-    EventResponse Create(CreateEventRequest request);
-    bool Update(Guid id, UpdateEventRequest request);
-    bool Delete(Guid id);
-    bool TryReserveSeat(Guid eventId);
-    bool ReleaseSeat(Guid eventId);
+    Task<PaginatedResult<EventResponse>> GetAllAsync(
+        string? title,
+        DateTime? from,
+        DateTime? to,
+        int page,
+        int pageSize);
+
+    Task<EventResponse?> GetByIdAsync(Guid id);
+
+    Task<EventResponse> CreateAsync(CreateEventRequest request);
+
+    Task<bool> UpdateAsync(Guid id, UpdateEventRequest request);
+
+    Task<bool> DeleteAsync(Guid id);
+
+    Task<bool> TryReserveSeatAsync(Guid eventId);
+
+    Task<bool> ReleaseSeatAsync(Guid eventId);
 }

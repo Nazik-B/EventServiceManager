@@ -8,7 +8,7 @@ public class Event : IValidatableObject
     public Guid Id { get; set; }
 
     [Required(ErrorMessage = "Title is required")]
-    public required string Title { get; set; }
+    public string Title { get; set; } = null!;
 
     public string? Description { get; set; }
 
@@ -21,6 +21,13 @@ public class Event : IValidatableObject
     [Range(1, int.MaxValue, ErrorMessage = "TotalSeats must be greater than zero")]
     public int TotalSeats { get; set; }
     public int AvailableSeats  { get; private set; }
+
+    public ICollection<Booking> Bookings { get; private set; } = new List<Booking>();
+
+    private Event()
+    {
+        
+    }
 
     [SetsRequiredMembers]
     private Event(Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)

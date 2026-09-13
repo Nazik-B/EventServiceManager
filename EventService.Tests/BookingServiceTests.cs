@@ -401,4 +401,57 @@ public class BookingServiceTests
         Assert.NotNull(updatedEvent);
         Assert.Equal(0, updatedEvent!.AvailableSeats);
     }
+
+    [Fact]
+    public async Task CreateBookingAsync_AssignsUniqueIds_WhenRequestsAreConcurrent()
+    {
+        const int totalSeats = 10;
+        const int concurrentRequests = 10;
+
+        Guid eventId;
+
+        using (var setupScope = _serviceProvider.CreateScope())
+        {
+            var setupEventService = setupScope.ServiceProvider
+                .GetRequiredService<IEventService>();
+
+            var createdEvent = await setupEventService.CreateAsync(
+                BuildEventRequest(totalSeats: totalSeats));
+
+            eventId = createdEvent.Id;
+        }
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var requestScope = _serviceProvider.CreateScope();
+
+                var bookingService = requestScope.ServiceProvider
+                    .GetRequiredService<IBookingService>();
+
+                return await bookingService.CreateBookingAsync(eventId);
+            }))
+            .ToArray();
+
+        var bookings = await Task.WhenAll(tasks);
+
+        var uniqueBookingIds = bookings
+            .Select(booking => booking.Id)
+            .Distinct()
+            .Count();
+
+        Assert.Equal(concurrentRequests, bookings.Length);
+        Assert.Equal(concurrentRequests, uniqueBookingIds);
+
+        using var verificationScope = _serviceProvider.CreateScope();
+
+        var verificationEventService = verificationScope.ServiceProvider
+            .GetRequiredService<IEventService>();
+
+        var updatedEvent = await verificationEventService
+            .GetByIdAsync(eventId);
+
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(0, updatedEvent!.AvailableSeats);
+    }
 }

@@ -26,7 +26,8 @@ public class EventService : IEventService
 
         if (!string.IsNullOrWhiteSpace(title))
         {
-           query = query.Where(e => e.Title.Contains(title));
+            var normalizedTitle = title.ToLower();
+            query = query.Where(e =>e.Title.ToLower().Contains(normalizedTitle));
         }
 
         if (from.HasValue)

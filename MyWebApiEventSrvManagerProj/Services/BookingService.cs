@@ -38,14 +38,7 @@ public class BookingService : IBookingService
                 throw new NoAvailableSeatsException();
             }
 
-            var booking = new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = eventId,
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                ProcessedAt = null
-            };
+            var booking = Booking.Create(eventId);
 
             _context.Bookings.Add(booking);
 

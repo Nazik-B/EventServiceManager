@@ -1,6 +1,6 @@
+using EventsApi.DataAccess;
 using EventsApi.Models;
-using EventsApi.Services;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace MyWebApiEventSrvManagerProj.BackgroundServices;
 
@@ -11,7 +11,6 @@ public class BookingProcessingBackgroundService : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingProcessingBackgroundService> _logger;
-    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
 
     public BookingProcessingBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -21,7 +20,8 @@ public class BookingProcessingBackgroundService : BackgroundService
         _logger = logger;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
         _logger.LogInformation(
             "BookingProcessingBackgroundService started.");
@@ -30,18 +30,15 @@ public class BookingProcessingBackgroundService : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await using var scope = _scopeFactory.CreateAsyncScope();
+                var pendingBookingIds = await GetPendingBookingIdsAsync(
+                    stoppingToken);
 
-                var bookingService = scope.ServiceProvider
-                    .GetRequiredService<IBookingService>();
+                var tasks = pendingBookingIds.Select(
+                    bookingId => ProcessBookingAsync(
+                        bookingId,
+                        stoppingToken));
 
-                var pendingBookings = await bookingService
-                    .GetPendingBookingsAsync(stoppingToken);
-
-                foreach (var booking in pendingBookings)
-                {
-                    await ProcessBookingAsync(booking, stoppingToken);
-                }
+                await Task.WhenAll(tasks);
 
                 await Task.Delay(PollingInterval, stoppingToken);
             }
@@ -49,7 +46,7 @@ public class BookingProcessingBackgroundService : BackgroundService
         catch (OperationCanceledException)
             when (stoppingToken.IsCancellationRequested)
         {
-            // Штатная остановка приложения.
+            // Нормальная остановка приложения.
         }
         catch (Exception ex)
         {
@@ -64,41 +61,61 @@ public class BookingProcessingBackgroundService : BackgroundService
         }
     }
 
+    private async Task<List<Guid>> GetPendingBookingIdsAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+
+        var context = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        return await context.Bookings
+            .AsNoTracking()
+            .Where(booking => booking.Status == BookingStatus.Pending)
+            .Select(booking => booking.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task ProcessBookingAsync(
-        Booking booking,
+        Guid bookingId,
         CancellationToken stoppingToken)
     {
-        await _processingSemaphore.WaitAsync(stoppingToken);
-
         try
         {
             _logger.LogInformation(
-                "Processing booking {BookingId} for event {EventId}.",
-                booking.Id,
-                booking.EventId);
+                "Processing booking {BookingId}.",
+                bookingId);
 
             await Task.Delay(ProcessingDelay, stoppingToken);
 
             await using var scope = _scopeFactory.CreateAsyncScope();
 
-            var bookingService = scope.ServiceProvider
-                .GetRequiredService<IBookingService>();
+            var context = scope.ServiceProvider
+                .GetRequiredService<AppDbContext>();
 
-            var eventService = scope.ServiceProvider
-                .GetRequiredService<IEventService>();
+            var booking = await context.Bookings
+                .FirstOrDefaultAsync(
+                    item => item.Id == bookingId,
+                    stoppingToken);
+
+            if (booking is null || booking.Status != BookingStatus.Pending)
+            {
+                return;
+            }
+
+            var eventItem = await context.Events
+                .FirstOrDefaultAsync(
+                    item => item.Id == booking.EventId,
+                    stoppingToken);
 
             var processedAt = DateTime.UtcNow;
 
-            var eventItem = await eventService
-                .GetByIdAsync(booking.EventId);
-
             if (eventItem is null)
             {
-                await bookingService.UpdateBookingStatusAsync(
-                    booking.Id,
-                    BookingStatus.Rejected,
-                    processedAt,
-                    stoppingToken);
+                booking.Status = BookingStatus.Rejected;
+                booking.ProcessedAt = processedAt;
+
+                await context.SaveChangesAsync(stoppingToken);
 
                 _logger.LogWarning(
                     "Booking {BookingId} was rejected because event {EventId} was not found.",
@@ -108,11 +125,10 @@ public class BookingProcessingBackgroundService : BackgroundService
                 return;
             }
 
-            await bookingService.UpdateBookingStatusAsync(
-                booking.Id,
-                BookingStatus.Confirmed,
-                processedAt,
-                stoppingToken);
+            booking.Status = BookingStatus.Confirmed;
+            booking.ProcessedAt = processedAt;
+
+            await context.SaveChangesAsync(stoppingToken);
 
             _logger.LogInformation(
                 "Booking {BookingId} confirmed at {ProcessedAt}.",
@@ -124,7 +140,7 @@ public class BookingProcessingBackgroundService : BackgroundService
         {
             _logger.LogInformation(
                 "Processing of booking {BookingId} was cancelled.",
-                booking.Id);
+                bookingId);
 
             throw;
         }
@@ -133,43 +149,53 @@ public class BookingProcessingBackgroundService : BackgroundService
             _logger.LogError(
                 ex,
                 "Unexpected error while processing booking {BookingId}.",
-                booking.Id);
+                bookingId);
 
-            try
-            {
-                await using var scope = _scopeFactory.CreateAsyncScope();
-
-                var bookingService = scope.ServiceProvider
-                    .GetRequiredService<IBookingService>();
-
-                var eventService = scope.ServiceProvider
-                    .GetRequiredService<IEventService>();
-
-                var processedAt = DateTime.UtcNow;
-
-                await bookingService.UpdateBookingStatusAsync(
-                    booking.Id,
-                    BookingStatus.Rejected,
-                    processedAt,
-                    CancellationToken.None);
-
-                await eventService.ReleaseSeatAsync(booking.EventId);
-
-                _logger.LogWarning(
-                    "Booking {BookingId} was rejected and a seat was released.",
-                    booking.Id);
-            }
-            catch (Exception rejectionEx)
-            {
-                _logger.LogError(
-                    rejectionEx,
-                    "Failed to reject booking {BookingId}.",
-                    booking.Id);
-            }
+            await RejectBookingAndReleaseSeatAsync(bookingId);
         }
-        finally
+    }
+
+    private async Task RejectBookingAndReleaseSeatAsync(Guid bookingId)
+    {
+        try
         {
-            _processingSemaphore.Release();
+            await using var scope = _scopeFactory.CreateAsyncScope();
+
+            var context = scope.ServiceProvider
+                .GetRequiredService<AppDbContext>();
+
+            var booking = await context.Bookings
+                .FirstOrDefaultAsync(item => item.Id == bookingId);
+
+            if (booking is null || booking.Status != BookingStatus.Pending)
+            {
+                return;
+            }
+
+            var eventItem = await context.Events
+                .FirstOrDefaultAsync(
+                    item => item.Id == booking.EventId);
+
+            booking.Status = BookingStatus.Rejected;
+            booking.ProcessedAt = DateTime.UtcNow;
+
+            if (eventItem is not null)
+            {
+                eventItem.ReleaseSeats();
+            }
+
+            await context.SaveChangesAsync();
+
+            _logger.LogWarning(
+                "Booking {BookingId} was rejected and a seat was released.",
+                booking.Id);
+        }
+        catch (Exception rejectionEx)
+        {
+            _logger.LogError(
+                rejectionEx,
+                "Failed to reject booking {BookingId}.",
+                bookingId);
         }
     }
 }

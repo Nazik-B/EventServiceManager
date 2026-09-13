@@ -2,17 +2,17 @@ using System.ComponentModel.DataAnnotations;
 using EventsApi.Models.Dto;
 using EventsApi.Services;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventService.Tests;
 
 public class EventServiceTests
 {
-    private static EventsApi.Services.EventService CreateService(
-        out EventsApi.DataAccess.AppDbContext context)
-    {
-        context = TestDbContextFactory.Create();
+    private readonly ServiceProvider _serviceProvider;
 
-        return new EventsApi.Services.EventService(context);
+    public EventServiceTests()
+    {
+        _serviceProvider = TestDbContextFactory.CreateServiceProvider();
     }
 
     private static CreateEventRequest BuildRequest(
@@ -34,8 +34,8 @@ public class EventServiceTests
     [Fact]
     public async Task CreateAsync_AddsEvent_AndReturnsItWithGeneratedId()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var request = BuildRequest(
             "Team Meeting",
@@ -53,8 +53,8 @@ public class EventServiceTests
     [Fact]
     public async Task CreateAsync_AssignsUniqueIds_ForMultipleEvents()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var first = await service.CreateAsync(BuildRequest(
             "Event 1",
@@ -74,8 +74,8 @@ public class EventServiceTests
     [Fact]
     public async Task CreateAsync_ThrowsValidationException_WhenEndAtBeforeStartAt()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var request = BuildRequest(
             "Invalid Event",
@@ -89,8 +89,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsEmptyResult_WhenNoEventsExist()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var result = await service.GetAllAsync(
             null,
@@ -106,8 +106,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllEvents_WhenNoFiltersApplied()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         await service.CreateAsync(BuildRequest(
             "Event 1",
@@ -133,8 +133,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetByIdAsync_ReturnsEvent_WhenExists()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var created = await service.CreateAsync(BuildRequest(
             "Team Meeting",
@@ -151,8 +151,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetByIdAsync_ReturnsNull_WhenNotExists()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var found = await service.GetByIdAsync(Guid.NewGuid());
 
@@ -162,8 +162,8 @@ public class EventServiceTests
     [Fact]
     public async Task UpdateAsync_ModifiesEvent_WhenExists()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var created = await service.CreateAsync(BuildRequest(
             "Old Title",
@@ -191,8 +191,8 @@ public class EventServiceTests
     [Fact]
     public async Task UpdateAsync_ReturnsFalse_WhenEventNotFound()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var updateRequest = new UpdateEventRequest
         {
@@ -211,8 +211,8 @@ public class EventServiceTests
     [Fact]
     public async Task UpdateAsync_ThrowsValidationException_WhenEndAtBeforeStartAt()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var created = await service.CreateAsync(BuildRequest(
             "Original",
@@ -233,8 +233,8 @@ public class EventServiceTests
     [Fact]
     public async Task DeleteAsync_RemovesEvent_WhenExists()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var created = await service.CreateAsync(BuildRequest(
             "To Delete",
@@ -251,8 +251,8 @@ public class EventServiceTests
     [Fact]
     public async Task DeleteAsync_ReturnsFalse_WhenEventNotFound()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         var result = await service.DeleteAsync(Guid.NewGuid());
 
@@ -268,8 +268,8 @@ public class EventServiceTests
         string titleFilter,
         int expectedCount)
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         await service.CreateAsync(BuildRequest(
             "Team Meeting",
@@ -294,8 +294,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_FiltersByFromDate_ExcludesEarlierEvents()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         await service.CreateAsync(BuildRequest(
             "Early Event",
@@ -321,8 +321,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_FiltersByToDate_ExcludesLaterEvents()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         await service.CreateAsync(BuildRequest(
             "Early Event",
@@ -348,8 +348,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsCorrectPageSize()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         for (var i = 1; i <= 3; i++)
         {
@@ -373,8 +373,8 @@ public class EventServiceTests
     [Fact]
     public async Task GetAllAsync_CombinesTitleAndDateFilters()
     {
-        var service = CreateService(out var context);
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         await service.CreateAsync(BuildRequest(
             "Team Standup",

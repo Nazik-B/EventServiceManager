@@ -5,22 +5,17 @@ using EventsApi.Models.Dto;
 using EventsApi.Services;
 using MyWebApiEventSrvManagerProj.Exceptions;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventService.Tests;
 
 public class BookingServiceTests
 {
-    private static (
-        AppDbContext context,
-        BookingService bookingService,
-        EventsApi.Services.EventService eventService) CreateServices()
+    private readonly ServiceProvider _serviceProvider;
+    
+    public BookingServiceTests()
     {
-        var context = TestDbContextFactory.Create();
-
-        var eventService = new EventsApi.Services.EventService(context);
-        var bookingService = new BookingService(context);
-
-        return (context, bookingService, eventService);
+        _serviceProvider = TestDbContextFactory.CreateServiceProvider();
     }
 
     private static CreateEventRequest BuildEventRequest(
@@ -39,8 +34,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_ReturnsPendingBooking_ForExistingEvent()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest());
@@ -57,8 +57,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_AssignsUniqueIds_ForMultipleBookings()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
@@ -75,8 +80,13 @@ public class BookingServiceTests
     [Fact]
     public async Task GetBookingByIdAsync_ReturnsCorrectBooking_WhenExists()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest());
@@ -95,8 +105,13 @@ public class BookingServiceTests
     [Fact]
     public async Task GetBookingByIdAsync_ReturnsNull_ForNonExistentId()
     {
-        var (context, bookingService, _) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var found = await bookingService.GetBookingByIdAsync(
             Guid.NewGuid());
@@ -110,8 +125,13 @@ public class BookingServiceTests
     public async Task UpdateBookingStatusAsync_ChangesStatusAndProcessedAt(
         BookingStatus finalStatus)
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest());
@@ -137,8 +157,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_DecreasesAvailableSeatsByOne()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
@@ -154,8 +179,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_UsesAllSeatsWithoutOverbooking()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
@@ -173,8 +203,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_ThrowsNoAvailableSeatsException_WhenSeatsExhausted()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 1));
@@ -188,8 +223,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_ThrowsNotFoundException_ForNonExistentEvent()
     {
-        var (context, bookingService, _) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         await Assert.ThrowsAsync<NotFoundException>(
             () => bookingService.CreateBookingAsync(Guid.NewGuid()));
@@ -198,8 +238,13 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_ThrowsNotFoundException_ForDeletedEvent()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest());
@@ -213,8 +258,13 @@ public class BookingServiceTests
     [Fact]
     public async Task RejectAndReleaseSeat_RestoresAvailableSeats()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 1));
@@ -242,8 +292,13 @@ public class BookingServiceTests
     [Fact]
     public async Task RejectAndReleaseSeat_AllowsNewBooking()
     {
-        var (context, bookingService, eventService) = CreateServices();
-        await using var _ = context;
+        using var scope = _serviceProvider.CreateScope();
+
+        var bookingService = scope.ServiceProvider
+            .GetRequiredService<IBookingService>();
+
+        var eventService = scope.ServiceProvider
+            .GetRequiredService<IEventService>();
 
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 1));
@@ -267,6 +322,82 @@ public class BookingServiceTests
 
         Assert.NotEqual(rejectedBooking.Id, newBooking.Id);
         Assert.Equal(BookingStatus.Pending, newBooking.Status);
+        Assert.NotNull(updatedEvent);
+        Assert.Equal(0, updatedEvent!.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_DoesNotAllowOverbooking_WhenRequestsAreConcurrent()
+    {
+        const int totalSeats = 5;
+        const int concurrentRequests = 20;
+
+        Guid eventId;
+
+        using (var setupScope = _serviceProvider.CreateScope())
+        {
+            var setupEventService = setupScope.ServiceProvider
+                .GetRequiredService<IEventService>();
+
+            var createdEvent = await setupEventService.CreateAsync(
+                BuildEventRequest(totalSeats: totalSeats));
+
+            eventId = createdEvent.Id;
+        }
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var requestScope = _serviceProvider.CreateScope();
+
+                var bookingService = requestScope.ServiceProvider
+                    .GetRequiredService<IBookingService>();
+
+                try
+                {
+                    var booking = await bookingService
+                        .CreateBookingAsync(eventId);
+
+                    return (Booking: booking, Exception: (Exception?)null);
+                }
+                catch (Exception ex)
+                {
+                    return (Booking: (Booking?)null, Exception: ex);
+                }
+            }))
+            .ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        var successfulBookings = results
+            .Where(result => result.Booking is not null)
+            .Select(result => result.Booking!)
+            .ToList();
+
+        var exceptions = results
+            .Where(result => result.Exception is not null)
+            .Select(result => result.Exception!)
+            .ToList();
+
+        Assert.Equal(totalSeats, successfulBookings.Count);
+
+        Assert.Equal(
+            concurrentRequests - totalSeats,
+            exceptions.Count);
+
+        Assert.All(
+            exceptions,
+            exception => Assert.IsType<NoAvailableSeatsException>(
+                exception));
+
+        using var verificationScope = _serviceProvider.CreateScope();
+
+        var verificationEventService = verificationScope.ServiceProvider
+            .GetRequiredService<IEventService>();
+
+        var updatedEvent = await verificationEventService
+            .GetByIdAsync(eventId);
+
         Assert.NotNull(updatedEvent);
         Assert.Equal(0, updatedEvent!.AvailableSeats);
     }

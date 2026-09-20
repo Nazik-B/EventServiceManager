@@ -20,6 +20,7 @@ public static class TestDbContextFactory
             options.UseInMemoryDatabase(dbName));
         
         services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventServiceImplementation>();
         services.AddScoped<IBookingService, BookingService>();
 

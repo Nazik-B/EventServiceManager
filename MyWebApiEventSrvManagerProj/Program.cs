@@ -4,6 +4,8 @@ using MyWebApiEventSrvManagerProj.BackgroundServices;
 using EventsApi.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using EventsApi.Repositories;
+using EventsApi.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +18,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -30,7 +32,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider
         .GetRequiredService<AppDbContext>();
 
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 app.UseGlobalExceptionHandling();

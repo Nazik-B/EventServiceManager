@@ -5,10 +5,9 @@ namespace EventsApi.Repositories.Interfaces;
 public interface IBookingRepository
 {
     Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<Booking>> GetAllAsync(
-        CancellationToken cancellationToken = default);
-
+    Task<Booking?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Booking>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Booking>> GetPendingAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetByEventIdAsync(
         Guid eventId,
         CancellationToken cancellationToken = default);

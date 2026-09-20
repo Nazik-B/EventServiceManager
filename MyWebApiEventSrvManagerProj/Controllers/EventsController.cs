@@ -27,7 +27,7 @@ public class EventsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        var result = _eventService.GetAll(title, from, to, page, pageSize);
+        var result = _eventService.GetAllAsync(title, from, to, page, pageSize);
         return Ok(result);
     }
 
@@ -35,7 +35,7 @@ public class EventsController : ControllerBase
     [HttpGet("{id:guid}")]
     public ActionResult<EventResponse> GetById(Guid id)
     {
-        var eventItem = _eventService.GetById(id);
+        var eventItem = _eventService.GetByIdAsync(id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Event with id {id} was not found");
@@ -48,15 +48,15 @@ public class EventsController : ControllerBase
     [HttpPost]
     public ActionResult<EventResponse> Create([FromBody] CreateEventRequest request)
     {
-        var created = _eventService.Create(request);
+        var created = _eventService.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     // PUT /events/{id}
     [HttpPut("{id:guid}")]
-    public IActionResult Update(Guid id, [FromBody] UpdateEventRequest request)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        var updated = _eventService.Update(id, request);
+        var updated = await _eventService.UpdateAsync(id, request);
         if (!updated)
         {
             throw new NotFoundException($"Event with id {id} was not found");
@@ -67,9 +67,9 @@ public class EventsController : ControllerBase
 
     // DELETE /events/{id}
     [HttpDelete("{id:guid}")]
-    public IActionResult Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        var deleted = _eventService.Delete(id);
+        var deleted = await _eventService.DeleteAsync(id);
         if (!deleted)
         {
             throw new NotFoundException($"Event with id {id} was not found");

@@ -13,7 +13,7 @@ public interface IEventRepository
 
     Task<Event?> GetByIdAsync(Guid id);
 
-    Task<Event?> GetByIdForUpdateAsync(Guid id);
+    Task<Event?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task AddAsync(Event eventItem);
 

@@ -104,4 +104,14 @@ public sealed class BookingRepository : IBookingRepository
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetPendingIdsAsync(
+    CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Bookings
+            .AsNoTracking()
+            .Where(booking => booking.Status == BookingStatus.Pending)
+            .Select(booking => booking.Id)
+            .ToListAsync(cancellationToken);
+    }
 }

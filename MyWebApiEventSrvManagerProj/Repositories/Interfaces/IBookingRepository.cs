@@ -8,9 +8,8 @@ public interface IBookingRepository
     Task<Booking?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetPendingAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Booking>> GetByEventIdAsync(
-        Guid eventId,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> GetPendingIdsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Booking>> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken = default);
 
     Task AddAsync(Booking entity, CancellationToken cancellationToken = default);
 

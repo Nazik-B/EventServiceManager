@@ -41,6 +41,7 @@ public sealed class BookingRepository : IBookingRepository
         return await _dbContext.Bookings
             .AsNoTracking()
             .OrderByDescending(booking => booking.CreatedAt)
+            .ThenByDescending(booking => booking.Id)
             .ToListAsync(cancellationToken);
     }
 

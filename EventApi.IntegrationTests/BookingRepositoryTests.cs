@@ -5,6 +5,7 @@ using Xunit;
 
 namespace EventApi.IntegrationTests;
 
+[Collection(PostgresCollection.Name)]
 public class BookingRepositoryTests : IntegrationTestBase
 {
     public BookingRepositoryTests(PostgresTestContainer fixture) : base(fixture) { }
@@ -31,6 +32,7 @@ public class BookingRepositoryTests : IntegrationTestBase
 
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
 
         var fromDb = await DbContext.Bookings.FindAsync(booking.Id);
         Assert.NotNull(fromDb);
@@ -45,6 +47,8 @@ public class BookingRepositoryTests : IntegrationTestBase
         var booking = CreateBooking(ev.Id);
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
+        
 
         var result = await repo.GetByIdAsync(booking.Id);
 
@@ -84,16 +88,21 @@ public class BookingRepositoryTests : IntegrationTestBase
     {
         var repo = CreateRepository();
         var ev = await SeedEventAsync();
+
         var b1 = CreateBooking(ev.Id);
+        await Task.Delay(50);
         var b2 = CreateBooking(ev.Id);
+
         await repo.AddAsync(b1);
         await repo.AddAsync(b2);
         await repo.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
 
-        var result = await repo.GetAllAsync();
+        var result = (await repo.GetAllAsync()).ToList();
 
-        Assert.Equal(2, result.Count());
-        Assert.Equal(b2.Id, result.First().Id);
+        Assert.Equal(2, result.Count);
+        Assert.Equal(b2.Id, result[0].Id);
+        Assert.Equal(b1.Id, result[1].Id);
     }
 
     [Fact]
@@ -106,12 +115,16 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.SaveChangesAsync();
 
         var tracked = await repo.GetByIdForUpdateAsync(booking.Id);
+        Assert.NotNull(tracked);
         tracked.Status = BookingStatus.Confirmed;
         tracked.ProcessedAt = DateTime.UtcNow;
-        await repo.UpdateAsync(tracked!);
+
+        await repo.UpdateAsync(tracked);
         await repo.SaveChangesAsync();
+        DbContext.ChangeTracker.Clear();
 
         var updated = await DbContext.Bookings.FindAsync(booking.Id);
+        Assert.NotNull(updated);
         Assert.Equal(BookingStatus.Confirmed, updated.Status);
         Assert.NotNull(updated.ProcessedAt);
     }

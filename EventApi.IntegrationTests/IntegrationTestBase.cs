@@ -7,7 +7,7 @@ using Xunit;
 
 namespace EventApi.IntegrationTests;
 
-public abstract class IntegrationTestBase : IClassFixture<PostgresTestContainer>, IAsyncLifetime
+public abstract class IntegrationTestBase : IAsyncLifetime
 {
     private readonly PostgresTestContainer _fixture;
 
@@ -23,8 +23,8 @@ public abstract class IntegrationTestBase : IClassFixture<PostgresTestContainer>
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(fixture.ConnectionString));
 
-        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IEventRepository, EventRepository>();
 
         Services = services.BuildServiceProvider();
         DbContext = Services.GetRequiredService<AppDbContext>();
@@ -36,5 +36,9 @@ public abstract class IntegrationTestBase : IClassFixture<PostgresTestContainer>
         await DbContext.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task DisposeAsync()
+    {
+        await DbContext.DisposeAsync();
+        await Services.DisposeAsync();
+    }
 }

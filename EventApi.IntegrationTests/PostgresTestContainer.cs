@@ -14,12 +14,11 @@ public sealed class PostgresTestContainer : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase(DatabaseName)
-            .WithUsername(Username)
-            .WithPassword(Password)
-            .Build();
+        _container = new PostgreSqlBuilder("postgres:16-alpine")
+        .WithDatabase(DatabaseName)
+        .WithUsername(Username)
+        .WithPassword(Password)
+        .Build();
 
         await _container.StartAsync();
     }

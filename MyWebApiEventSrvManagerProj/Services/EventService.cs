@@ -1,83 +1,67 @@
+using System.ComponentModel.DataAnnotations;
 using EventsApi.Models;
 using EventsApi.Models.Dto;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using MyWebApiEventSrvManagerProj.Exceptions;
-using EventsApi.DataAccess;
-using System.Threading;
+using EventsApi.Repositories.Interfaces;
 
 namespace EventsApi.Services;
 
 public class EventService : IEventService
 {
-    private readonly AppDbContext _context;
+    private readonly IEventRepository _eventRepository;
 
-    public EventService(AppDbContext context)
+    public EventService(IEventRepository eventRepository)
     {
-        _context = context;
+        _eventRepository = eventRepository;
     }
 
-    public async Task<PaginatedResult<EventResponse>> GetAllAsync(string? title, DateTime? from, DateTime? to, int page, int pageSize)
+    public async Task<PaginatedResult<EventResponse>> GetAllAsync(
+        string? title,
+        DateTime? from,
+        DateTime? to,
+        int page,
+        int pageSize)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1) pageSize = 10;
-
-        IQueryable<Event> query = _context.Events.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(title))
+        if (page < 1)
         {
-            var normalizedTitle = title.ToLower();
-            query = query.Where(e =>e.Title.ToLower().Contains(normalizedTitle));
+            page = 1;
         }
 
-        if (from.HasValue)
+        if (pageSize < 1)
         {
-            query = query.Where(e => e.StartAt >= from.Value);
+            pageSize = 10;
         }
 
-        if (to.HasValue)
-        {
-            query = query.Where(e => e.EndAt <= to.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(e => new EventResponse
-            {
-                Id = e.Id,
-                Title = e.Title,
-                Description = e.Description,
-                StartAt = e.StartAt,
-                EndAt = e.EndAt,
-                TotalSeats = e.TotalSeats,
-                AvailableSeats = e.AvailableSeats
-            })
-            .ToListAsync();
+        var result = await _eventRepository.GetPagedAsync(
+            title,
+            from,
+            to,
+            page,
+            pageSize);
 
         return new PaginatedResult<EventResponse>
         {
-            TotalCount = totalCount,
-            Items = items,
+            TotalCount = result.TotalCount,
+            Items = result.Items.Select(MapToResponse).ToList(),
             Page = page,
             PageSize = pageSize
         };
     }
+
     public async Task<EventResponse?> GetByIdAsync(Guid id)
     {
-        var eventItem = await _context.Events
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+        var eventItem = await _eventRepository.GetByIdAsync(id);
 
-        return eventItem is null ? null : MapToResponse(eventItem);
+        return eventItem is null
+            ? null
+            : MapToResponse(eventItem);
     }
+
     public async Task<EventResponse> CreateAsync(CreateEventRequest request)
     {
         ValidateDates(request.StartAt, request.EndAt);
 
-        var eventItem =  Event.Create(
+        var eventItem = Event.Create(
             Guid.NewGuid(),
             request.Title,
             request.Description,
@@ -85,18 +69,20 @@ public class EventService : IEventService
             request.EndAt!.Value,
             request.TotalSeats!.Value);
 
-        _context.Events.Add(eventItem);
-
-        await _context.SaveChangesAsync();
+        await _eventRepository.AddAsync(eventItem);
+        await _eventRepository.SaveChangesAsync();
 
         return MapToResponse(eventItem);
     }
 
     public async Task<bool> UpdateAsync(Guid id, UpdateEventRequest request)
     {
-        var existing = await _context.Events.FindAsync(id);
+        var existing = await _eventRepository.GetByIdForUpdateAsync(id);
+
         if (existing is null)
+        {
             return false;
+        }
 
         ValidateDates(request.StartAt, request.EndAt);
 
@@ -105,19 +91,59 @@ public class EventService : IEventService
         existing.StartAt = request.StartAt!.Value;
         existing.EndAt = request.EndAt!.Value;
 
-        await _context.SaveChangesAsync();
+        await _eventRepository.SaveChangesAsync();
+
         return true;
     }
 
     public async Task<bool> DeleteAsync(Guid id)
     {
-        var existing = await _context.Events.FindAsync(id);
+        var existing = await _eventRepository.GetByIdForUpdateAsync(id);
+
         if (existing is null)
+        {
             return false;
+        }
 
-        _context.Events.Remove(existing);
+        _eventRepository.Delete(existing);
+        await _eventRepository.SaveChangesAsync();
 
-        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> TryReserveSeatAsync(Guid eventId)
+    {
+        var eventItem = await _eventRepository.GetByIdForUpdateAsync(eventId);
+
+        if (eventItem is null)
+        {
+            throw new NotFoundException(
+                $"Event with id {eventId} was not found");
+        }
+
+        var reserved = eventItem.TryReserveSeats();
+
+        if (reserved)
+        {
+            await _eventRepository.SaveChangesAsync();
+        }
+
+        return reserved;
+    }
+
+    public async Task<bool> ReleaseSeatAsync(Guid eventId)
+    {
+        var eventItem = await _eventRepository.GetByIdForUpdateAsync(eventId);
+
+        if (eventItem is null)
+        {
+            return false;
+        }
+
+        eventItem.ReleaseSeats();
+
+        await _eventRepository.SaveChangesAsync();
+
         return true;
     }
 
@@ -136,42 +162,8 @@ public class EventService : IEventService
     {
         if (startAt.HasValue && endAt.HasValue && endAt <= startAt)
         {
-            throw new ValidationException("EndAt must be later than StartAt");
+            throw new ValidationException(
+                "EndAt must be later than StartAt");
         }
-    }
-
-    public async Task<bool> TryReserveSeatAsync(Guid eventId)
-    {
-        var eventItem = await _context.Events.FindAsync(eventId);
-
-        if (eventItem is null)
-        {
-            throw new NotFoundException(
-                $"Event with id {eventId} was not found");
-        }
-
-        var reserved = eventItem.TryReserveSeats();
-
-        if (reserved)
-        {
-            await _context.SaveChangesAsync();
-        }
-
-        return reserved;
-    }
-    public async Task<bool> ReleaseSeatAsync(Guid eventId)
-    {
-        var eventItem = await _context.Events.FindAsync(eventId);
-
-        if (eventItem is null)
-        {
-            return false;
-        }
-
-        eventItem.ReleaseSeats();
-
-        await _context.SaveChangesAsync();
-
-        return true;
     }
 }

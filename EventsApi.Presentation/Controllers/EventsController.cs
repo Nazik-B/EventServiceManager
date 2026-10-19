@@ -1,0 +1,99 @@
+using Microsoft.AspNetCore.Mvc;
+using EventsApi.Models.Dto;
+using EventsApi.Services;
+using EventsApi.Presentation.Exceptions;
+
+namespace EventsApi.Controllers;
+
+[ApiController]
+[Route("events")]
+public class EventsController : ControllerBase
+{
+    private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
+
+    public EventsController(IEventService eventService, IBookingService bookingService)
+    {
+        _eventService = eventService;
+        _bookingService = bookingService;
+    }
+
+    // GET /events?title=...&from=...&to=...&page=1&pageSize=10
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? title,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var result = await _eventService.GetAllAsync(title, from, to, page, pageSize);
+        return Ok(result);
+    }
+
+    // GET /events/{id}
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var eventItem = await _eventService.GetByIdAsync(id);
+        if (eventItem is null)
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
+
+        return Ok(eventItem);
+    }
+
+    // POST /events
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
+    {
+        var created = await _eventService.CreateAsync(request);
+        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+    }
+
+    // PUT /events/{id}
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
+    {
+        var updated = await _eventService.UpdateAsync(id, request);
+        if (!updated)
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
+
+        return NoContent();
+    }
+
+    // DELETE /events/{id}
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var deleted = await _eventService.DeleteAsync(id);
+        if (!deleted)
+        {
+            throw new NotFoundException($"Event with id {id} was not found");
+        }
+
+        return NoContent();
+    }
+
+    // POST /events/{id}/book
+    [HttpPost("{id:guid}/book")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Book(Guid id)
+    {
+        var booking = await _bookingService.CreateBookingAsync(id);
+
+        var response = new BookingResponse
+        {
+            Id = booking.Id,
+            EventId = booking.EventId,
+            Status = booking.Status,
+            CreatedAt = booking.CreatedAt,
+            ProcessedAt = booking.ProcessedAt
+        };
+
+        return Accepted($"/bookings/{booking.Id}", response);
+    }
+}

@@ -56,7 +56,7 @@ docker compose ps events-db
 Строка подключения задаётся в файле:
 
 ```text
-MyWebApiEventSrvManagerProj/appsettings.json
+EventsApi.Presentation/appsettings.json
 ```
 
 Пример конфигурации для локального PostgreSQL-контейнера:
@@ -79,7 +79,7 @@ MyWebApiEventSrvManagerProj/appsettings.json
 
 ### Схема базы данных и миграции
 
-Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `MyWebApiEventSrvManagerProj`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
+Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `EventsApi.Presentation`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
 
 При старте API в `Program.cs` вызывается `Database.Migrate()`: все неприменённые миграции применяются к базе автоматически. Поэтому для локального запуска достаточно поднять PostgreSQL и выполнить `dotnet run`. Команду `dotnet ef database update` используйте, когда нужно применить миграции вручную, не запуская API.
 
@@ -94,32 +94,32 @@ dotnet tool install --global dotnet-ef
 Создать новую миграцию после изменения моделей или конфигураций:
 
 ```bash
-dotnet ef migrations add <MigrationName> --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef migrations add <MigrationName> --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Применить все неприменённые миграции к базе данных:
 
 ```bash
-dotnet ef database update --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef database update --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Посмотреть список миграций:
 
 ```bash
-dotnet ef migrations list --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef migrations list --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Удалить последнюю миграцию, если она ещё не применена к базе:
 
 ```bash
-dotnet ef migrations remove --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef migrations remove --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Пересоздать локальную базу с нуля:
 
 ```bash
-dotnet ef database drop --force --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
-dotnet ef database update --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef database drop --force --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef database update --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Если имя миграции уже занято, выберите другое (например, `AddBookingStatusIndex`) или удалите неприменённую миграцию командой `migrations remove`.
@@ -129,7 +129,7 @@ dotnet ef database update --project MyWebApiEventSrvManagerProj/MyWebApiEventSrv
 Перейдите в папку с файлом проекта (`.csproj`) и восстановите зависимости:
 
 ```bash
-cd MyWebApiEventSrvManagerProj
+cd EventsApi.Presentation
 dotnet restore
 ```
 
@@ -399,8 +399,8 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 В решении два тестовых проекта:
 
-- `EventService.Tests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони с существующим и несуществующим событием). Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
-- `EventApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
+- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони с существующим и несуществующим событием). Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
+- `EventsApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
 
 ### Интеграционные тесты и Docker
 
@@ -428,13 +428,13 @@ dotnet test
 Только unit-тесты (Docker не нужен):
 
 ```bash
-dotnet test EventService.Tests
+dotnet test EventsApi.UnitTests
 ```
 
 Только интеграционные тесты (нужен Docker):
 
 ```bash
-dotnet test EventApi.IntegrationTests
+dotnet test EventsApi.IntegrationTests
 ```
 
 Запустить тесты с отчётом о покрытии кода:

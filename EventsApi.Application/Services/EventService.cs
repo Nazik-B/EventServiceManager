@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using EventsApi.Domain.Entities;
-using EventsApi.Models.Dto;
+using EventsApi.Application.Dto;
 using EventsApi.Domain.Exceptions;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 
-namespace EventsApi.Services;
+namespace EventsApi.Application.Services;
 
 public class EventService : IEventService
 {

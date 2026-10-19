@@ -1,6 +1,6 @@
 using EventsApi.DataAccess;
 using EventsApi.Repositories;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

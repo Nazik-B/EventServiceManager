@@ -1,6 +1,6 @@
 using EventsApi.Domain.Entities;
 
-namespace EventsApi.Services;
+namespace EventsApi.Application.Services;
 
 public interface IBookingService
 {

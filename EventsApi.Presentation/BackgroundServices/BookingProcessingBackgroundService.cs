@@ -1,5 +1,5 @@
 using EventsApi.Domain.Entities;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 
 namespace EventsApi.Presentation.BackgroundServices;
 

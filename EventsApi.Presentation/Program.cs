@@ -1,11 +1,11 @@
 using EventsApi.Presentation.Middleware;
-using EventsApi.Services;
+using EventsApi.Application.Services;
 using EventsApi.Presentation.BackgroundServices;
 using EventsApi.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using EventsApi.Repositories;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 

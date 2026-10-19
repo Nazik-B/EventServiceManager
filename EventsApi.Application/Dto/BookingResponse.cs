@@ -1,6 +1,6 @@
 using EventsApi.Domain.Entities;
 
-namespace EventsApi.Models.Dto;
+namespace EventsApi.Application.Dto;
 
 public class BookingResponse
 {

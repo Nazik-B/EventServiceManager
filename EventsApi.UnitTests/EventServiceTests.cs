@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using EventsApi.Models.Dto;
-using EventsApi.Services;
+using EventsApi.Application.Dto;
+using EventsApi.Application.Services;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 

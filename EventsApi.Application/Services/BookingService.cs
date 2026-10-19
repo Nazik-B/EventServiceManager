@@ -1,8 +1,8 @@
 using EventsApi.Domain.Entities;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 using EventsApi.Domain.Exceptions;
 
-namespace EventsApi.Services;
+namespace EventsApi.Application.Services;
 
 public class BookingService : IBookingService
 {

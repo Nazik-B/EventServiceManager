@@ -1,6 +1,6 @@
 using EventsApi.DataAccess;
 using EventsApi.Domain.Entities;
-using EventsApi.Repositories.Interfaces;
+using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventsApi.Repositories;

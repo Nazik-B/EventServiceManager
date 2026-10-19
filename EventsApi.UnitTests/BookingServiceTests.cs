@@ -1,8 +1,8 @@
 using EventsApi.DataAccess;
 using EventsApi.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
-using EventsApi.Models.Dto;
-using EventsApi.Services;
+using EventsApi.Application.Dto;
+using EventsApi.Application.Services;
 using EventsApi.Domain.Exceptions;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;

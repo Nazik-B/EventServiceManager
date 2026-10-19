@@ -1,4 +1,4 @@
-namespace EventsApi.Models.Dto;
+namespace EventsApi.Application.Dto;
 
 public class PaginatedResult<T>
 {

@@ -8,28 +8,33 @@
 - Swashbuckle.AspNetCore (Swagger UI)
 - Entity Framework Core
 - Npgsql.EntityFrameworkCore.PostgreSQL
+- EF Core Migrations (`dotnet-ef`)
 - PostgreSQL 16
-- xUnit (unit-тестирование)
+- xUnit (unit- и интеграционное тестирование)
 - Microsoft.EntityFrameworkCore.InMemory для unit-тестов
+- Testcontainers for .NET (`Testcontainers.PostgreSql`) для интеграционных тестов
 
 ## Требования
 
 - Установленный .NET SDK 10.0 или новее
 - PostgreSQL 16 или новее
 - Docker Desktop и Docker Compose — рекомендуемый способ запуска PostgreSQL
+- Docker Desktop должен быть запущен для интеграционных тестов (см. раздел «Запуск тестов»)
+- Инструмент EF Core CLI: `dotnet tool install --global dotnet-ef`
 - Git
 
 Перед запуском API убедитесь, что PostgreSQL доступен по параметрам, указанным в строке подключения.
 
 ## Запуск проекта
 
-Клонируйте репозиторий и перейдите в ветку `sprint-5`, где ведётся текущая разработка:
+Клонируйте репозиторий и перейдите в ветку `sprint-6`, где ведётся текущая разработка:
 
 ```bash
 git clone <URL_репозитория>
 cd EventServiceManager
-git checkout sprint-5
+git checkout sprint-6
 ```
+
 ### Запуск PostgreSQL через Docker
 
 В корневой папке проекта находится `docker-compose.yml`. Для запуска базы данных событий выполните:
@@ -63,6 +68,7 @@ MyWebApiEventSrvManagerProj/appsettings.json
   }
 }
 ```
+
 Значения должны совпадать с параметрами PostgreSQL:
 
 - `Host` — адрес PostgreSQL, для локального Docker-контейнера `localhost`
@@ -71,22 +77,55 @@ MyWebApiEventSrvManagerProj/appsettings.json
 - `Username` — пользователь PostgreSQL, например `postgres`
 - `Password` — пароль пользователя PostgreSQL
 
-### Автоматическое создание схемы
+### Схема базы данных и миграции
 
-При запуске API EF Core вызывает `Database.EnsureCreated()`.
+Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `MyWebApiEventSrvManagerProj`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
 
-Если база данных и таблицы ещё не существуют, EF Core автоматически создаёт схему, включая таблицы:
+При старте API в `Program.cs` вызывается `Database.Migrate()`: все неприменённые миграции применяются к базе автоматически. Поэтому для локального запуска достаточно поднять PostgreSQL и выполнить `dotnet run`. Команду `dotnet ef database update` используйте, когда нужно применить миграции вручную, не запуская API.
 
-```text
-events
-bookings
+Установите инструмент EF Core CLI (один раз):
+
+```bash
+dotnet tool install --global dotnet-ef
 ```
 
-Также автоматически создаются первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс для `EventId`.
+Все команды выполняются из корня репозитория. Перед применением миграций запустите PostgreSQL (`docker compose up -d events-db`), а строка подключения `DefaultConnection` в `appsettings.json` должна указывать на эту базу.
 
-`EnsureCreated()` предназначен для учебного проекта. Его не следует сочетать с миграциями EF Core: если в будущем будут добавлены миграции, потребуется использовать `Database.Migrate()` либо пересоздать базу данных.
+Создать новую миграцию после изменения моделей или конфигураций:
+
+```bash
+dotnet ef migrations add <MigrationName> --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+```
+
+Применить все неприменённые миграции к базе данных:
+
+```bash
+dotnet ef database update --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+```
+
+Посмотреть список миграций:
+
+```bash
+dotnet ef migrations list --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+```
+
+Удалить последнюю миграцию, если она ещё не применена к базе:
+
+```bash
+dotnet ef migrations remove --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+```
+
+Пересоздать локальную базу с нуля:
+
+```bash
+dotnet ef database drop --force --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+dotnet ef database update --project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj --startup-project MyWebApiEventSrvManagerProj/MyWebApiEventSrvManagerProj.csproj
+```
+
+Если имя миграции уже занято, выберите другое (например, `AddBookingStatusIndex`) или удалите неприменённую миграцию командой `migrations remove`.
 
 ### Запуск API
+
 Перейдите в папку с файлом проекта (`.csproj`) и восстановите зависимости:
 
 ```bash
@@ -215,7 +254,7 @@ dotnet run
 
 `SemaphoreSlim` используется вместо `lock`, потому что внутри критической секции выполняются асинхронные операции с `await`.
 
-Фоновый сервис не использует один общий `DbContext`. Он получает `IServiceScopeFactory`, загружает идентификаторы необработанных броней в отдельном scope, а для обработки каждой брони создаёт новый scope. Поэтому каждая фоновая задача использует собственный экземпляр `AppDbContext`.
+Фоновый сервис не использует один общий `DbContext`. Он получает `IServiceScopeFactory`, загружает идентификаторы необработанных броней в отдельном scope, а для обработки каждой брони создаёт новый scope. Поэтому каждая фоновая задача использует собственный экземпляр `AppDbContext` и scoped-репозитории.
 
 ## Логика фоновой обработки бронирований
 
@@ -224,7 +263,7 @@ dotnet run
 1. `BookingService` проверяет существование события через `IEventService`. Если событие не найдено, запрос завершается `404` до создания брони.
 2. Если событие существует, создаётся объект `Booking` со статусом `Pending`, сохраняется в хранилище и добавляется в очередь на обработку.
 3. Контроллер немедленно возвращает `202 Accepted` с телом брони и заголовком `Location` — клиент не ждёт завершения обработки.
-4. Фоновый сервис `BookingProcessingBackgroundService` (реализует `BackgroundService`) асинхронно забирает брони из очереди, выполняет проверку бизнес-правил или `Rejected` и заполняет `processedAt`.
+4. Фоновый сервис `BookingProcessingBackgroundService` (реализует `BackgroundService`) асинхронно забирает брони из очереди, выполняет проверку бизнес-правил, переводит бронь в `Confirmed` или `Rejected` и заполняет `processedAt`.
 5. Клиент узнаёт итоговый результат, опрашивая `GET /bookings/{id}` до тех пор, пока `status` не сменится с `Pending` на конечное значение.
 
 Такой подход разгружает HTTP-запрос от потенциально долгой обработки и позволяет масштабировать очередь бронирований независимо от веб-слоя.
@@ -234,8 +273,8 @@ dotnet run
 ### Создание события
 
 ```bash
-curl -X POST http://localhost:5102/events \\
-  -H "Content-Type: application/json" \\
+curl -X POST http://localhost:5102/events \
+  -H "Content-Type: application/json" \
   -d '{"title":"Standup","description":"Daily meeting","startAt":"2026-07-09T10:00:00","endAt":"2026-07-09T10:15:00","totalSeats":10}'
 ```
 
@@ -270,8 +309,8 @@ curl http://localhost:5102/events/EVENT_ID
 ### Обновление события
 
 ```bash
-curl -X PUT http://localhost:5102/events/EVENT_ID \\
-  -H "Content-Type: application/json" \\
+curl -X PUT http://localhost:5102/events/EVENT_ID \
+  -H "Content-Type: application/json" \
   -d '{"title":"Updated Standup","startAt":"2026-07-09T11:00:00","endAt":"2026-07-09T11:30:00"}'
 ```
 
@@ -283,9 +322,9 @@ curl -X DELETE http://localhost:5102/events/EVENT_ID
 
 ### Сквозной сценарий бронирования
 
-\`\`\`bash
+```bash
 # 1. Создать событие
-curl -i -X POST http://localhost:5102/events/EVENT_ID \
+curl -i -X POST http://localhost:5102/events \
   -H "Content-Type: application/json" \
   -d '{"title":"Final Check","startAt":"2026-08-10T10:00:00","endAt":"2026-08-10T11:00:00","totalSeats": 3}'
 # → 201 Created, тело содержит "id" события (EVENT_ID)
@@ -313,7 +352,8 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 # → 409 Conflict
-\`\`\`
+```
+
 Тот же сценарий можно выполнить через Swagger UI (`/swagger`): последовательно вызвать `POST /events`, `POST /events/{id}/book` и несколько раз `GET /bookings/{id}` с задержкой, наблюдая переход статуса из `Pending` в `Confirmed`.
 
 После трёх успешных броней `availableSeats` равен `0`. Четвёртый запрос не создаёт бронь и возвращает `409 Conflict`, что предотвращает овербукинг.
@@ -324,7 +364,7 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 ```json
 {
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+  "type": "[https://tools.ietf.org/html/rfc9110#section-15.5.5](https://tools.ietf.org/html/rfc9110#section-15.5.5)",
   "title": "Resource not found",
   "status": 404,
   "detail": "Event with id 999 was not found",
@@ -357,27 +397,44 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 ## Запуск тестов
 
-Проект включает отдельный тестовый проект `EventService.Tests` на xUnit, содержащий unit-тесты для `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingServiceTests` (создание брони с существующим и несуществующим событием).
+В решении два тестовых проекта:
 
-## Тестовая база данных
+- `EventService.Tests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони с существующим и несуществующим событием). Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
+- `EventApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
 
-Unit-тесты не используют PostgreSQL и не требуют запуска Docker-контейнера.
+### Интеграционные тесты и Docker
 
-Для тестов применяется провайдер `Microsoft.EntityFrameworkCore.InMemory`. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу данных через `Guid.NewGuid().ToString()`.
+Интеграционные тесты проверяют все методы `EventRepository` и `BookingRepository` на настоящей базе PostgreSQL 16, включая все фильтры (`title`, `from`, `to`, их комбинации и границы диапазонов) и пагинацию метода `GetPagedAsync`.
 
-Сервисы и `AppDbContext` регистрируются через `ServiceCollection`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope, поэтому получает собственный scoped-экземпляр `AppDbContext`, но использует общую InMemory-базу конкретного тестового класса.
+**Для запуска интеграционных тестов необходим запущенный Docker** (Docker Desktop со статусом `Engine running`). Вручную поднимать контейнер или запускать `docker compose` не нужно: Testcontainers сам скачает образ `postgres:16-alpine` (при первом запуске это займёт время), запустит контейнер и удалит его после тестов.
 
-Запустить все тесты из корня решения:
+Как устроена изоляция тестов:
+
+- Все тесты используют один контейнер PostgreSQL (xUnit collection fixture `PostgresCollection`).
+- Строка подключения берётся из объекта контейнера (порт назначается автоматически), а не из `appsettings.json`.
+- Тесты работают с отдельной базой `event_service_tests`.
+- Перед каждым тестом база пересоздаётся: `Database.EnsureDeleted()`, затем `Database.Migrate()`. Схема создаётся теми же миграциями EF Core, что и в приложении, поэтому тесты не зависят от порядка запуска.
+
+Если Docker не запущен, интеграционные тесты завершатся ошибкой `DockerUnavailableException`. Запустите Docker Desktop, убедитесь, что команда `docker ps` отвечает, и повторите запуск.
+
+### Команды
+
+Запустить все тесты из корня решения (нужен Docker):
 
 ```bash
 dotnet test
 ```
 
-Запустить тесты только для конкретного проекта:
+Только unit-тесты (Docker не нужен):
 
 ```bash
-cd EventService.Tests
-dotnet test
+dotnet test EventService.Tests
+```
+
+Только интеграционные тесты (нужен Docker):
+
+```bash
+dotnet test EventApi.IntegrationTests
 ```
 
 Запустить тесты с отчётом о покрытии кода:
@@ -386,8 +443,8 @@ dotnet test
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
-Ожидаемый результат при успешном прохождении всех тестов:
+Ожидаемый результат при успешном прохождении:
 
-```
-Сводка теста: всего: 37; сбой: 0; успешно: 37; пропущено: 0
+```text
+Сводка теста: сбой: 0, пропущено: 0
 ```

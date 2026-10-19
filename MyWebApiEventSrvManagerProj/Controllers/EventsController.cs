@@ -20,22 +20,22 @@ public class EventsController : ControllerBase
 
     // GET /events?title=...&from=...&to=...&page=1&pageSize=10
     [HttpGet]
-    public ActionResult<PaginatedResult<EventResponse>> GetAll(
+    public async Task<IActionResult> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        var result = _eventService.GetAllAsync(title, from, to, page, pageSize);
+        var result = await _eventService.GetAllAsync(title, from, to, page, pageSize);
         return Ok(result);
     }
 
     // GET /events/{id}
     [HttpGet("{id:guid}")]
-    public ActionResult<EventResponse> GetById(Guid id)
+    public async Task<IActionResult> GetById(Guid id)
     {
-        var eventItem = _eventService.GetByIdAsync(id);
+        var eventItem = await _eventService.GetByIdAsync(id);
         if (eventItem is null)
         {
             throw new NotFoundException($"Event with id {id} was not found");
@@ -46,9 +46,9 @@ public class EventsController : ControllerBase
 
     // POST /events
     [HttpPost]
-    public ActionResult<EventResponse> Create([FromBody] CreateEventRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
-        var created = _eventService.CreateAsync(request);
+        var created = await _eventService.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 

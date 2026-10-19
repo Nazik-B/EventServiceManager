@@ -1,4 +1,4 @@
-using EventsApi.Models;
+using EventsApi.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventsApi.DataAccess;

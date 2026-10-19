@@ -1,5 +1,5 @@
 
-namespace EventsApi.Models;
+namespace EventsApi.Domain.Entities;
 
 public class Booking
 {

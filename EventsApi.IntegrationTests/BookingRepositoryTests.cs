@@ -1,4 +1,4 @@
-using EventsApi.Models;
+using EventsApi.Domain.Entities;
 using EventsApi.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

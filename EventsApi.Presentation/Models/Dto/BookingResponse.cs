@@ -1,4 +1,4 @@
-using EventsApi.Models;
+using EventsApi.Domain.Entities;
 
 namespace EventsApi.Models.Dto;
 

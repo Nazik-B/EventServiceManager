@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using EventsApi.Models.Dto;
 using EventsApi.Services;
-using EventsApi.Presentation.Exceptions;
+using EventsApi.Domain.Exceptions;
 
 namespace EventsApi.Controllers;
 

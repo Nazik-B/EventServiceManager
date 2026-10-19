@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using EventsApi.Models;
+using EventsApi.Domain.Entities;
 using EventsApi.Models.Dto;
-using EventsApi.Presentation.Exceptions;
+using EventsApi.Domain.Exceptions;
 using EventsApi.Repositories.Interfaces;
 
 namespace EventsApi.Services;

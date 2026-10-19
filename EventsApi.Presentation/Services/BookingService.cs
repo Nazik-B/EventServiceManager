@@ -1,6 +1,6 @@
-using EventsApi.Models;
+using EventsApi.Domain.Entities;
 using EventsApi.Repositories.Interfaces;
-using EventsApi.Presentation.Exceptions;
+using EventsApi.Domain.Exceptions;
 
 namespace EventsApi.Services;
 

@@ -1,9 +1,9 @@
-using EventsApi.DataAccess;
+using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
 
-namespace EventsApi.Repositories;
+namespace EventsApi.Infrastructure.Repositories;
 
 public sealed class EventRepository : IEventRepository
 {

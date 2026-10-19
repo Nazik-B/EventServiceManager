@@ -1,5 +1,5 @@
 using EventsApi.Domain.Entities;
-using EventsApi.Repositories;
+using EventsApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

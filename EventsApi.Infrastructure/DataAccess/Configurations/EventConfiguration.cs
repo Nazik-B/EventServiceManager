@@ -2,7 +2,7 @@ using EventsApi.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace EventsApi.DataAccess.Configurations;
+namespace EventsApi.Infrastructure.DataAccess.Configurations;
 
 internal sealed class EventConfiguration : IEntityTypeConfiguration<Event>
 {

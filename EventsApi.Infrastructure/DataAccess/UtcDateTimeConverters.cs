@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
-namespace EventsApi.DataAccess;
+namespace EventsApi.Infrastructure.DataAccess;
 
 public sealed class UtcDateTimeConverter : ValueConverter<DateTime, DateTime>
 {

@@ -1,9 +1,9 @@
-﻿using EventsApi.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Application.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using EventServiceImplementation = EventsApi.Application.Services.EventService;
-using EventsApi.Repositories;
+using EventsApi.Infrastructure.Repositories;
 using EventsApi.Application.Repositories;
 
 namespace EventsApi.UnitTests;

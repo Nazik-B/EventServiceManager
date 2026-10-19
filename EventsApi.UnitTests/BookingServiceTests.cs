@@ -1,4 +1,4 @@
-using EventsApi.DataAccess;
+using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
 using EventsApi.Application.Dto;

@@ -1,5 +1,5 @@
-using EventsApi.DataAccess;
-using EventsApi.Repositories;
+using EventsApi.Infrastructure.DataAccess;
+using EventsApi.Infrastructure.Repositories;
 using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

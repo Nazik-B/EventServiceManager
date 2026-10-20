@@ -1,6 +1,5 @@
 using EventsApi.Application;
 using EventsApi.Infrastructure;
-using EventsApi.Presentation.BackgroundServices;
 using EventsApi.Presentation.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,7 +15,6 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
 builder.Services.AddApplication();
-builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 
 var app = builder.Build();
 

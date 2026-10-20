@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<IBookingProcessingService, BookingProcessingService>();
         return services;
     }
 }

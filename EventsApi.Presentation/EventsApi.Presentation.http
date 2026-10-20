@@ -1,0 +1,26 @@
+@EventsApi_HostAddress = http://localhost:5102
+@eventId = 00000000-0000-0000-0000-000000000000
+@bookingId = 00000000-0000-0000-0000-000000000000
+
+### Создать событие
+POST {{EventsApi_HostAddress}}/events
+Content-Type: application/json
+
+{
+  "title": "Final Check",
+  "startAt": "2026-08-10T10:00:00Z",
+  "endAt": "2026-08-10T11:00:00Z",
+  "totalSeats": 3
+}
+
+### Список событий
+GET {{EventsApi_HostAddress}}/events?page=1&pageSize=10
+
+### Событие по id (подставьте id из ответа на создание)
+GET {{EventsApi_HostAddress}}/events/{{eventId}}
+
+### Создать бронь
+POST {{EventsApi_HostAddress}}/events/{{eventId}}/book
+
+### Бронь по id (подставьте id из ответа на бронирование)
+GET {{EventsApi_HostAddress}}/bookings/{{bookingId}}

@@ -85,15 +85,6 @@ public class EventsController : ControllerBase
     {
         var booking = await _bookingService.CreateBookingAsync(id);
 
-        var response = new BookingResponse
-        {
-            Id = booking.Id,
-            EventId = booking.EventId,
-            Status = booking.Status,
-            CreatedAt = booking.CreatedAt,
-            ProcessedAt = booking.ProcessedAt
-        };
-
-        return Accepted($"/bookings/{booking.Id}", response);
+        return Accepted($"/bookings/{booking.Id}", booking);
     }
 }

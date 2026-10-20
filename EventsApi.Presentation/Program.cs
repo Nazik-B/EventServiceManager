@@ -1,4 +1,4 @@
-using EventsApi.Application.Services;
+using EventsApi.Application;
 using EventsApi.Infrastructure;
 using EventsApi.Presentation.BackgroundServices;
 using EventsApi.Presentation.Middleware;
@@ -15,8 +15,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddApplication();
 builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 
 var app = builder.Build();

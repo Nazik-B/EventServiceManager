@@ -362,7 +362,7 @@ public class BookingServiceTests
                 }
                 catch (Exception ex)
                 {
-                    return (Booking: (Booking?)null, Exception: ex);
+                    return (Booking: (BookingResponse?)null, Exception: ex);
                 }
             }))
             .ToArray();

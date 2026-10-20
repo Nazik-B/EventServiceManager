@@ -1,6 +1,7 @@
 using EventsApi.Domain.Entities;
 using EventsApi.Application.Repositories;
 using EventsApi.Domain.Exceptions;
+using EventsApi.Application.Dto;
 
 namespace EventsApi.Application.Services;
 
@@ -19,7 +20,7 @@ public class BookingService : IBookingService
         _eventRepository = eventRepository;
     }
 
-    public async Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<BookingResponse> CreateBookingAsync(Guid eventId)
     {
         await BookingSemaphore.WaitAsync();
 
@@ -46,7 +47,7 @@ public class BookingService : IBookingService
             await _bookingRepository.AddAsync(booking);
             await _bookingRepository.SaveChangesAsync();
 
-            return booking;
+            return ToResponse(booking);
         }
         finally
         {
@@ -54,9 +55,10 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId)
     {
-        return _bookingRepository.GetByIdAsync(bookingId);
+ 	var booking = await _bookingRepository.GetByIdAsync(bookingId);
+ 	return booking is null ? null : ToResponse(booking);
     }
 
     public async Task<IEnumerable<Booking>> GetPendingBookingsAsync(
@@ -85,4 +87,13 @@ public class BookingService : IBookingService
 
         await _bookingRepository.SaveChangesAsync(cancellationToken);
     }
+
+    private static BookingResponse ToResponse(Booking booking) => new()
+    {
+        Id = booking.Id,
+        EventId = booking.EventId,
+        Status = booking.Status,
+        CreatedAt = booking.CreatedAt,
+        ProcessedAt = booking.ProcessedAt
+    };
 }

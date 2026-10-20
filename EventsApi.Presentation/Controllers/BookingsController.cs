@@ -26,15 +26,7 @@ public class BookingsController : ControllerBase
             throw new NotFoundException($"Booking with id {id} was not found");
         }
 
-        var response = new BookingResponse
-        {
-            Id = booking.Id,
-            EventId = booking.EventId,
-            Status = booking.Status,
-            CreatedAt = booking.CreatedAt,
-            ProcessedAt = booking.ProcessedAt
-        };
-
-        return Ok(response);
+        return Ok(booking);
     }
+
 }

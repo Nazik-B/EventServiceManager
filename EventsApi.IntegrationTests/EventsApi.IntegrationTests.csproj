@@ -32,7 +32,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventsApi.Presentation\EventsApi.Presentation.csproj" />
+    <ProjectReference Include="..\EventsApi.Application\EventsApi.Application.csproj" />
+    <ProjectReference Include="..\EventsApi.Domain\EventsApi.Domain.csproj" />
+    <ProjectReference Include="..\EventsApi.Infrastructure\EventsApi.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

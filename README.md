@@ -14,6 +14,35 @@
 - Microsoft.EntityFrameworkCore.InMemory для unit-тестов
 - Testcontainers for .NET (`Testcontainers.PostgreSql`) для интеграционных тестов
 
+## Архитектура и структура проекта
+
+Решение построено по слоистой (чистой) архитектуре. Зависимости направлены только внутрь: внешние слои знают о внутренних, но не наоборот.
+
+```text
+EventServiceManager/
+├── EventsApi.Domain/           # сущности и доменные исключения
+├── EventsApi.Application/      # сценарии использования, DTO, интерфейсы репозиториев
+├── EventsApi.Infrastructure/   # EF Core, репозитории, миграции, фоновая обработка
+├── EventsApi.Presentation/     # веб-слой: контроллеры, middleware, Program.cs
+├── EventsApi.UnitTests/
+└── EventsApi.IntegrationTests/
+```
+
+| Слой | Содержимое | Зависит от |
+|---|---|---|
+| `EventsApi.Domain` | Сущности `Event`, `Booking`, `BookingStatus`; исключения `NotFoundException`, `NoAvailableSeatsException`, `DomainValidationException` | ни от чего |
+| `EventsApi.Application` | DTO; интерфейсы `IEventRepository`, `IBookingRepository`; сервисы `EventService`, `BookingService`, `BookingProcessingService`; метод `AddApplication()` | Domain |
+| `EventsApi.Infrastructure` | `AppDbContext`, конфигурации и конвертеры EF Core; реализации репозиториев; миграции; `BookingProcessingBackgroundService`; методы `AddInfrastructure()` и `ApplyMigrations()` | Application, Domain |
+| `EventsApi.Presentation` | Контроллеры, `ExceptionHandlingMiddleware`, `ExceptionMapper`, `Program.cs` (composition root) | Application, Infrastructure |
+
+Правила:
+
+- Application не зависит от Infrastructure: интерфейсы репозиториев лежат в Application, реализации — в Infrastructure.
+- Контроллеры только принимают HTTP-запрос, вызывают сервис Application и возвращают ответ, бизнес-логики в них нет.
+- Доменные исключения превращаются в HTTP-статусы в `ExceptionMapper` (Presentation): `NotFoundException` → 404, `NoAvailableSeatsException` → 409, ошибки валидации → 400.
+- `Program.cs` только регистрирует зависимости через `AddApplication()` и `AddInfrastructure(...)`.
+- Тестовые проекты ссылаются на Application, Domain и Infrastructure, но не на Presentation.
+
 ## Требования
 
 - Установленный .NET SDK 10.0 или новее
@@ -27,12 +56,12 @@
 
 ## Запуск проекта
 
-Клонируйте репозиторий и перейдите в ветку `sprint-6`, где ведётся текущая разработка:
+Клонируйте репозиторий и перейдите в ветку `sprint-7`, где ведётся текущая разработка:
 
 ```bash
 git clone <URL_репозитория>
 cd EventServiceManager
-git checkout sprint-6
+git checkout sprint-7
 ```
 
 ### Запуск PostgreSQL через Docker
@@ -79,9 +108,9 @@ EventsApi.Presentation/appsettings.json
 
 ### Схема базы данных и миграции
 
-Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `EventsApi.Presentation`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
+Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `EventsApi.Infrastructure`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
 
-При старте API в `Program.cs` вызывается `Database.Migrate()`: все неприменённые миграции применяются к базе автоматически. Поэтому для локального запуска достаточно поднять PostgreSQL и выполнить `dotnet run`. Команду `dotnet ef database update` используйте, когда нужно применить миграции вручную, не запуская API.
+При старте API `Program.cs` вызывает `app.Services.ApplyMigrations()` (метод расширения из Infrastructure), который выполняет `Database.Migrate()`: все неприменённые миграции применяются к базе автоматически. Поэтому для локального запуска достаточно поднять PostgreSQL и выполнить `dotnet run`. Команду `dotnet ef database update` используйте, когда нужно применить миграции вручную, не запуская API.
 
 Установите инструмент EF Core CLI (один раз):
 
@@ -94,48 +123,49 @@ dotnet tool install --global dotnet-ef
 Создать новую миграцию после изменения моделей или конфигураций:
 
 ```bash
-dotnet ef migrations add <MigrationName> --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef migrations add <MigrationName> --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Применить все неприменённые миграции к базе данных:
 
 ```bash
-dotnet ef database update --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef database update --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Посмотреть список миграций:
 
 ```bash
-dotnet ef migrations list --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef migrations list --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Удалить последнюю миграцию, если она ещё не применена к базе:
 
 ```bash
-dotnet ef migrations remove --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef migrations remove --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Пересоздать локальную базу с нуля:
 
 ```bash
-dotnet ef database drop --force --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
-dotnet ef database update --project EventsApi.Presentation/EventsApi.Presentation.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef database drop --force --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
+dotnet ef database update --project EventsApi.Infrastructure/EventsApi.Infrastructure.csproj --startup-project EventsApi.Presentation/EventsApi.Presentation.csproj
 ```
 
 Если имя миграции уже занято, выберите другое (например, `AddBookingStatusIndex`) или удалите неприменённую миграцию командой `migrations remove`.
 
 ### Запуск API
 
-Перейдите в папку с файлом проекта (`.csproj`) и восстановите зависимости:
+Запустите приложение из корня решения:
+
+```bash
+dotnet run --project EventsApi.Presentation
+```
+
+Либо перейдите в папку проекта, восстановите зависимости и запустите:
 
 ```bash
 cd EventsApi.Presentation
 dotnet restore
-```
-
-Запустите приложение:
-
-```bash
 dotnet run
 ```
 
@@ -148,7 +178,7 @@ dotnet run
 - `Description` — опциональное поле (может быть `null`).
 - `EndAt` должен быть строго позже `StartAt`, иначе API вернёт `400 Bad Request` с описанием ошибки в поле `EndAt` ("EndAt must be later than StartAt").
 - При создании и обновлении используются отдельные DTO (`CreateEventRequest`, `UpdateEventRequest`), клиент не может передавать `Id` вручную — идентификатор генерируется сервисом автоматически.
-- При создании брони (`POST /events/{id}/book`) `BookingService` проверяет существование события через `IEventService`; если событие не найдено, запрос завершается ошибкой `404 Not Found` до создания брони.
+- При создании брони (`POST /events/{id}/book`) `BookingService` проверяет существование события через `IEventRepository`; если событие не найдено, запрос завершается ошибкой `404 Not Found` до создания брони.
 - `TotalSeats` — обязательное поле; должно быть больше 0.
 - `AvailableSeats` клиент не передаёт: сервис вычисляет его автоматически.
 
@@ -236,7 +266,7 @@ dotnet run
 
 **Статусы:**
 
-- **`Pending`** — бронь создана и ожидает обработки в фоновой очереди. Начальный статус для любой новой брони.
+- **`Pending`** — бронь создана и ожидает обработки фоновым сервисом. Начальный статус для любой новой брони.
 - **`Confirmed`** — бронь успешно обработана и подтверждена.
 - **`Rejected`** — бронь отклонена во время фоновой обработки. Если для брони ранее резервировалось место, оно освобождается и возвращается в `AvailableSeats`.
 
@@ -260,13 +290,13 @@ dotnet run
 
 Создание брони через `POST /events/{id}/book` не выполняет обработку синхронно:
 
-1. `BookingService` проверяет существование события через `IEventService`. Если событие не найдено, запрос завершается `404` до создания брони.
-2. Если событие существует, создаётся объект `Booking` со статусом `Pending`, сохраняется в хранилище и добавляется в очередь на обработку.
+1. `BookingService` проверяет существование события через `IEventRepository`. Если событие не найдено, запрос завершается `404` до создания брони.
+2. Если есть свободное место, `BookingService` резервирует его, создаёт `Booking` со статусом `Pending` и сохраняет изменения одним вызовом `SaveChangesAsync()`.
 3. Контроллер немедленно возвращает `202 Accepted` с телом брони и заголовком `Location` — клиент не ждёт завершения обработки.
-4. Фоновый сервис `BookingProcessingBackgroundService` (реализует `BackgroundService`) асинхронно забирает брони из очереди, выполняет проверку бизнес-правил, переводит бронь в `Confirmed` или `Rejected` и заполняет `processedAt`.
+4. `BookingProcessingBackgroundService` (проект Infrastructure) каждые 5 секунд находит брони в статусе `Pending` и для каждой вызывает `IBookingProcessingService` из Application. Тот переводит бронь в `Confirmed` или `Rejected` и заполняет `processedAt`. В фоновом сервисе остались только опрос, задержки и логирование.
 5. Клиент узнаёт итоговый результат, опрашивая `GET /bookings/{id}` до тех пор, пока `status` не сменится с `Pending` на конечное значение.
 
-Такой подход разгружает HTTP-запрос от потенциально долгой обработки и позволяет масштабировать очередь бронирований независимо от веб-слоя.
+Такой подход разгружает HTTP-запрос от потенциально долгой обработки и позволяет вынести обработку бронирований из веб-слоя.
 
 ## Примеры запросов (curl)
 
@@ -364,7 +394,7 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 ```json
 {
-  "type": "[https://tools.ietf.org/html/rfc9110#section-15.5.5](https://tools.ietf.org/html/rfc9110#section-15.5.5)",
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
   "title": "Resource not found",
   "status": 404,
   "detail": "Event with id 999 was not found",

@@ -25,7 +25,7 @@ namespace EventsApi.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("EventsApi.Models.Booking", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -51,7 +51,7 @@ namespace EventsApi.Infrastructure.Migrations
                     b.ToTable("bookings", (string)null);
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Event", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Event", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -82,9 +82,9 @@ namespace EventsApi.Infrastructure.Migrations
                     b.ToTable("events", (string)null);
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Booking", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Booking", b =>
                 {
-                    b.HasOne("EventsApi.Models.Event", "Event")
+                    b.HasOne("EventsApi.Domain.Entities.Event", "Event")
                         .WithMany("Bookings")
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -93,7 +93,7 @@ namespace EventsApi.Infrastructure.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Event", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Event", b =>
                 {
                     b.Navigation("Bookings");
                 });

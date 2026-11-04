@@ -32,4 +32,15 @@ public class Booking
             ProcessedAt = null
         };
     }
+
+    public void Cancel()
+    {
+        if (Status == BookingStatus.Cancelled)
+            throw new DomainValidationException("Booking is already cancelled");
+
+        if (Status == BookingStatus.Rejected)
+            throw new DomainValidationException("Rejected booking cannot be cancelled");
+
+        Status = BookingStatus.Cancelled;
+    }
 }

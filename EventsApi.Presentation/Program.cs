@@ -17,6 +17,14 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
 builder.Services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
+
+builder.Services
+    .AddOptions<JwtOptions>()
+    .BindConfiguration(JwtOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddApplication();
 
 var app = builder.Build();

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using EventsApi.Application.Dto;
 using EventsApi.Application.Services;
+using EventsApi.Domain.Entities;
 using EventsApi.Domain.Exceptions;
 
 namespace EventsApi.Controllers;
@@ -83,7 +84,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Book(Guid id)
     {
-        var booking = await _bookingService.CreateBookingAsync(id);
+        var booking = await _bookingService.CreateBookingAsync(id, SystemUser.Id); // TODO: use the authenticated user's id once JWT auth is added
 
         return Accepted($"/bookings/{booking.Id}", booking);
     }

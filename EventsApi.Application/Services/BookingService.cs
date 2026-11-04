@@ -20,7 +20,7 @@ public class BookingService : IBookingService
         _eventRepository = eventRepository;
     }
 
-    public async Task<BookingResponse> CreateBookingAsync(Guid eventId)
+    public async Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId)
     {
         await BookingSemaphore.WaitAsync();
 
@@ -42,7 +42,7 @@ public class BookingService : IBookingService
                 throw new NoAvailableSeatsException();
             }
 
-            var booking = Booking.Create(eventId);
+            var booking = Booking.Create(eventId, userId);
 
             await _bookingRepository.AddAsync(booking);
             await _bookingRepository.SaveChangesAsync();

@@ -5,7 +5,7 @@ namespace EventsApi.Application.Services;
 
 public interface IBookingService
 {
-    Task<BookingResponse> CreateBookingAsync(Guid eventId);
+    Task<BookingResponse> CreateBookingAsync(Guid eventId, Guid userId);
     Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId);
     Task<IEnumerable<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken = default);
     Task UpdateBookingStatusAsync(Guid bookingId, BookingStatus status, DateTime processedAt, CancellationToken cancellationToken = default);

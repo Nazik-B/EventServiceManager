@@ -21,7 +21,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         return ev;
     }
 
-    private static Booking CreateBooking(Guid eventId) => Booking.Create(eventId);
+    private static Booking CreateBooking(Guid eventId) => Booking.Create(eventId, SystemUser.Id);
 
     [Fact]
     public async Task AddAsync_SavesBookingToDatabase()

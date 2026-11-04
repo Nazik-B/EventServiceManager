@@ -27,7 +27,7 @@ public class BookingService : IBookingService
         try
         {
             var eventItem = await _eventRepository
-                .GetByIdForUpdateAsync(eventId);
+                .GetByIdTrackedAsync(eventId);
 
             if (eventItem is null)
             {
@@ -73,7 +73,7 @@ public class BookingService : IBookingService
         DateTime processedAt,
         CancellationToken cancellationToken = default)
     {
-        var booking = await _bookingRepository.GetByIdForUpdateAsync(
+        var booking = await _bookingRepository.GetByIdTrackedAsync(
             bookingId,
             cancellationToken);
 

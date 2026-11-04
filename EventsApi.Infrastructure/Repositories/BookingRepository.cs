@@ -25,7 +25,7 @@ public sealed class BookingRepository : IBookingRepository
                 cancellationToken);
     }
 
-    public Task<Booking?> GetByIdForUpdateAsync(
+    public Task<Booking?> GetByIdTrackedAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {

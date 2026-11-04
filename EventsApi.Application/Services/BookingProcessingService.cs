@@ -23,14 +23,14 @@ public class BookingProcessingService : IBookingProcessingService
 
     public async Task<BookingProcessingResult> ProcessBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
-        var booking = await _bookingRepository.GetByIdForUpdateAsync(bookingId, cancellationToken);
+        var booking = await _bookingRepository.GetByIdTrackedAsync(bookingId, cancellationToken);
 
         if (booking is null || booking.Status != BookingStatus.Pending)
         {
             return BookingProcessingResult.Skipped;
         }
 
-        var eventItem = await _eventRepository.GetByIdForUpdateAsync(booking.EventId, cancellationToken);
+        var eventItem = await _eventRepository.GetByIdTrackedAsync(booking.EventId, cancellationToken);
 
         booking.ProcessedAt = DateTime.UtcNow;
 
@@ -48,14 +48,14 @@ public class BookingProcessingService : IBookingProcessingService
 
     public async Task<bool> RejectAndReleaseSeatAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
-        var booking = await _bookingRepository.GetByIdForUpdateAsync(bookingId, cancellationToken);
+        var booking = await _bookingRepository.GetByIdTrackedAsync(bookingId, cancellationToken);
 
         if (booking is null || booking.Status != BookingStatus.Pending)
         {
             return false;
         }
 
-        var eventItem = await _eventRepository.GetByIdForUpdateAsync(booking.EventId, cancellationToken);
+        var eventItem = await _eventRepository.GetByIdTrackedAsync(booking.EventId, cancellationToken);
 
         booking.Status = BookingStatus.Rejected;
         booking.ProcessedAt = DateTime.UtcNow;

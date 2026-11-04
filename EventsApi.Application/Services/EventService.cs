@@ -77,7 +77,7 @@ public class EventService : IEventService
 
     public async Task<bool> UpdateAsync(Guid id, UpdateEventRequest request)
     {
-        var existing = await _eventRepository.GetByIdForUpdateAsync(id);
+        var existing = await _eventRepository.GetByIdTrackedAsync(id);
 
         if (existing is null)
         {
@@ -98,7 +98,7 @@ public class EventService : IEventService
 
     public async Task<bool> DeleteAsync(Guid id)
     {
-        var existing = await _eventRepository.GetByIdForUpdateAsync(id);
+        var existing = await _eventRepository.GetByIdTrackedAsync(id);
 
         if (existing is null)
         {
@@ -113,7 +113,7 @@ public class EventService : IEventService
 
     public async Task<bool> TryReserveSeatAsync(Guid eventId)
     {
-        var eventItem = await _eventRepository.GetByIdForUpdateAsync(eventId);
+        var eventItem = await _eventRepository.GetByIdTrackedAsync(eventId);
 
         if (eventItem is null)
         {
@@ -133,7 +133,7 @@ public class EventService : IEventService
 
     public async Task<bool> ReleaseSeatAsync(Guid eventId)
     {
-        var eventItem = await _eventRepository.GetByIdForUpdateAsync(eventId);
+        var eventItem = await _eventRepository.GetByIdTrackedAsync(eventId);
 
         if (eventItem is null)
         {

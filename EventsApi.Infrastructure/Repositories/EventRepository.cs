@@ -59,7 +59,7 @@ public sealed class EventRepository : IEventRepository
             .FirstOrDefaultAsync(e => e.Id == id);
     }
 
-    public Task<Event?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<Event?> GetByIdTrackedAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _dbContext.Events
             .FirstOrDefaultAsync(

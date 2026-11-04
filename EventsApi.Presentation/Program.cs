@@ -1,3 +1,5 @@
+﻿using EventsApi.Infrastructure.Security;
+using EventsApi.Application.Abstractions;
 using EventsApi.Application;
 using EventsApi.Infrastructure;
 using EventsApi.Presentation.Middleware;
@@ -14,6 +16,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
+builder.Services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
 builder.Services.AddApplication();
 
 var app = builder.Build();

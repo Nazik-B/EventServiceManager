@@ -1,4 +1,4 @@
-using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
 using EventsApi.Application.Dto;
@@ -27,8 +27,8 @@ public class BookingServiceTests
         return new CreateEventRequest
         {
             Title = title,
-            StartAt = DateTime.Parse("2026-08-01T10:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T11:00:00"),
+            StartAt = DateTime.UtcNow.AddDays(30),
+            EndAt = DateTime.UtcNow.AddDays(30).AddHours(1),
             TotalSeats = totalSeats
         };
     }

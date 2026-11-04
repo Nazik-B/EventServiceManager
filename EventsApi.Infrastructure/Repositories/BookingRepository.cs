@@ -1,4 +1,4 @@
-using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -97,6 +97,17 @@ public sealed class BookingRepository : IBookingRepository
     {
         return _dbContext.Bookings.AnyAsync(
             booking => booking.Id == id,
+            cancellationToken);
+    }
+
+    public Task<int> CountActiveByUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Bookings.CountAsync(
+            booking => booking.UserId == userId
+                && (booking.Status == BookingStatus.Pending
+                    || booking.Status == BookingStatus.Confirmed),
             cancellationToken);
     }
 

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
 using EventsApi.Domain.Exceptions;
 
@@ -14,7 +14,7 @@ public static class ExceptionMapper
             ValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid argument"),
             NoAvailableSeatsException => (StatusCodes.Status409Conflict, "No available seats"),
-            PastEventBookingException => (StatusCodes.Status409Conflict, "Event has already started"),
+            PastEventBookingException => (StatusCodes.Status400BadRequest, "Event has already started"),
             ActiveBookingsLimitExceededException => (StatusCodes.Status409Conflict, "Active bookings limit exceeded"),
             ForbiddenOperationException => (StatusCodes.Status403Forbidden, "Forbidden"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),

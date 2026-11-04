@@ -1,4 +1,4 @@
-using EventsApi.Domain.Entities;
+﻿using EventsApi.Domain.Entities;
 using EventsApi.Application.Repositories;
 using EventsApi.Domain.Exceptions;
 using EventsApi.Application.Dto;
@@ -7,6 +7,8 @@ namespace EventsApi.Application.Services;
 
 public class BookingService : IBookingService
 {
+    private const int MaxActiveBookingsPerUser = 10;
+
     private static readonly SemaphoreSlim BookingSemaphore = new(1, 1);
 
     private readonly IBookingRepository _bookingRepository;
@@ -33,6 +35,19 @@ public class BookingService : IBookingService
             {
                 throw new NotFoundException(
                     $"Event with id {eventId} was not found");
+            }
+
+            if (eventItem.StartAt <= DateTime.UtcNow)
+            {
+                throw new PastEventBookingException();
+            }
+
+            var activeCount = await _bookingRepository
+                .CountActiveByUserAsync(userId);
+
+            if (activeCount >= MaxActiveBookingsPerUser)
+            {
+                throw new ActiveBookingsLimitExceededException(MaxActiveBookingsPerUser);
             }
 
             var reserved = eventItem.TryReserveSeats();

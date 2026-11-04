@@ -18,7 +18,7 @@ public class CreateEventRequest : IValidatableObject
     [Required(ErrorMessage = "TotalSeats is required")]
     [Range(1, int.MaxValue, ErrorMessage = "TotalSeats must be greater than zero")]
     public int? TotalSeats { get; set; }
-  
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (StartAt.HasValue && EndAt.HasValue && EndAt <= StartAt)

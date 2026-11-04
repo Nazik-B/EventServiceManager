@@ -1,4 +1,4 @@
-﻿using EventsApi.Infrastructure.DataAccess;
+using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Application.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +18,7 @@ public static class TestDbContextFactory
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
-        
+
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventServiceImplementation>();

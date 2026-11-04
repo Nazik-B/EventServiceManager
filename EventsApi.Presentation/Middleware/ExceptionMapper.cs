@@ -10,8 +10,8 @@ public static class ExceptionMapper
     {
         return exception switch
         {
-	    DomainValidationException => (StatusCodes.Status400BadRequest, "Validation error"),            
-	    ValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
+            DomainValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
+            ValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid argument"),
             NoAvailableSeatsException => (StatusCodes.Status409Conflict, "No available seats"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),

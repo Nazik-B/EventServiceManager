@@ -57,8 +57,8 @@ public class BookingService : IBookingService
 
     public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId)
     {
- 	var booking = await _bookingRepository.GetByIdAsync(bookingId);
- 	return booking is null ? null : ToResponse(booking);
+        var booking = await _bookingRepository.GetByIdAsync(bookingId);
+        return booking is null ? null : ToResponse(booking);
     }
 
     public async Task<IEnumerable<Booking>> GetPendingBookingsAsync(

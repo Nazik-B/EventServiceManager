@@ -37,7 +37,7 @@ public class EventRepositoryTests : IntegrationTestBase
         var repo = CreateRepository();
         var ev = CreateEvent("Концерт", DateTime.UtcNow, DateTime.UtcNow.AddHours(2));
         await repo.AddAsync(ev);
-        await repo.SaveChangesAsync();        
+        await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
 
         var result = await repo.GetByIdAsync(ev.Id);

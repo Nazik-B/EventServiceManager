@@ -12,17 +12,18 @@ public class Booking
 
     private Booking()
     {
-        
+
     }
     public static Booking Create(Guid eventId)
     {
-        return new Booking {
+        return new Booking
+        {
             Id = Guid.NewGuid(),
             EventId = eventId,
             Status = BookingStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             ProcessedAt = null
-            };
+        };
     }
 
 }

@@ -48,7 +48,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
-        
+
 
         var result = await repo.GetByIdAsync(booking.Id);
 

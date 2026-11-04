@@ -12,7 +12,7 @@ namespace EventsApi.UnitTests;
 public class BookingServiceTests
 {
     private readonly ServiceProvider _serviceProvider;
-    
+
     public BookingServiceTests()
     {
         _serviceProvider = TestDbContextFactory.CreateServiceProvider();

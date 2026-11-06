@@ -1,4 +1,4 @@
-using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Application.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +23,7 @@ public static class TestDbContextFactory
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventServiceImplementation>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<IBookingProcessingService, BookingProcessingService>();
 
         return services.BuildServiceProvider();
     }

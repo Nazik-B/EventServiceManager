@@ -103,6 +103,49 @@ public class BookingService : IBookingService
         await _bookingRepository.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<BookingResponse> CancelBookingAsync(
+        Guid bookingId,
+        Guid userId,
+        bool isAdmin,
+        CancellationToken cancellationToken = default)
+    {
+        await BookingSemaphore.WaitAsync(cancellationToken);
+
+        try
+        {
+            var booking = await _bookingRepository.GetByIdTrackedAsync(
+                bookingId,
+                cancellationToken);
+
+            if (booking is null)
+            {
+                throw new NotFoundException(
+                    $"Booking with id {bookingId} was not found");
+            }
+
+            if (booking.UserId != userId && !isAdmin)
+            {
+                throw new ForbiddenOperationException(
+                    "You can cancel only your own bookings");
+            }
+
+            booking.Cancel();
+
+            var eventItem = await _eventRepository.GetByIdTrackedAsync(
+                booking.EventId,
+                cancellationToken);
+
+            eventItem?.ReleaseSeats();
+
+            await _bookingRepository.SaveChangesAsync(cancellationToken);
+
+            return ToResponse(booking);
+        }
+        finally
+        {
+            BookingSemaphore.Release();
+        }
+    }
     private static BookingResponse ToResponse(Booking booking) => new()
     {
         Id = booking.Id,

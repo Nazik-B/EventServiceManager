@@ -3,6 +3,10 @@ using EventsApi.Application.Abstractions;
 using EventsApi.Application;
 using EventsApi.Infrastructure;
 using EventsApi.Presentation.Middleware;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +31,32 @@ builder.Services
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddApplication();
 
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((bearer, jwtAccessor) =>
+    {
+        var jwt = jwtAccessor.Value;
+
+        bearer.MapInboundClaims = false;
+        bearer.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwt.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwt.Audience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret)),
+            NameClaimType = "unique_name",
+            RoleClaimType = "role",
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+
 var app = builder.Build();
 
 app.Services.ApplyMigrations();
@@ -36,6 +66,7 @@ app.UseGlobalExceptionHandling();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

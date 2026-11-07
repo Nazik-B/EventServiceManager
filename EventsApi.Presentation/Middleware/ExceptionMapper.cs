@@ -16,6 +16,8 @@ public static class ExceptionMapper
             NoAvailableSeatsException => (StatusCodes.Status409Conflict, "No available seats"),
             PastEventBookingException => (StatusCodes.Status400BadRequest, "Event has already started"),
             ActiveBookingsLimitExceededException => (StatusCodes.Status409Conflict, "Active bookings limit exceeded"),
+            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials"),
+            UserAlreadyExistsException => (StatusCodes.Status409Conflict, "Login is already taken"),
             ForbiddenOperationException => (StatusCodes.Status403Forbidden, "Forbidden"),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "Concurrent modification"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),

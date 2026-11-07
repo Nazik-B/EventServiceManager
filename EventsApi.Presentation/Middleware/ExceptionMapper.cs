@@ -17,6 +17,7 @@ public static class ExceptionMapper
             PastEventBookingException => (StatusCodes.Status400BadRequest, "Event has already started"),
             ActiveBookingsLimitExceededException => (StatusCodes.Status409Conflict, "Active bookings limit exceeded"),
             ForbiddenOperationException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            ConcurrencyConflictException => (StatusCodes.Status409Conflict, "Concurrent modification"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error")

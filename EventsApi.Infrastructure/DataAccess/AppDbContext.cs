@@ -1,4 +1,4 @@
-using EventsApi.Domain.Entities;
+﻿using EventsApi.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventsApi.Infrastructure.DataAccess;
@@ -20,6 +20,18 @@ public sealed class AppDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(AppDbContext).Assembly);
+
+        modelBuilder.Entity<Booking>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<Event>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
 
         base.OnModelCreating(modelBuilder);
     }

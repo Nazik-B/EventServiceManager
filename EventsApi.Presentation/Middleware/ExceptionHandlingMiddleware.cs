@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventsApi.Presentation.Middleware;
@@ -79,6 +79,7 @@ public class ExceptionHandlingMiddleware
     {
         400 => "5.1",
         401 => "5.2",
+        403 => "5.4",
         404 => "5.5",
         409 => "5.8",
         _ => "6.1"

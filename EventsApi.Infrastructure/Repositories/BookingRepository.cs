@@ -111,10 +111,17 @@ public sealed class BookingRepository : IBookingRepository
             cancellationToken);
     }
 
-    public Task<int> SaveChangesAsync(
+    public async Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new EventsApi.Domain.Exceptions.ConcurrencyConflictException(ex);
+        }
     }
 
     public async Task<IReadOnlyList<Guid>> GetPendingIdsAsync(

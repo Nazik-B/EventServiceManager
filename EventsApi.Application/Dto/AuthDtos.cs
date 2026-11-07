@@ -5,6 +5,8 @@ namespace EventsApi.Application.Dto;
 
 public class RegisterRequest
 {
+    public Role? Role { get; init; }
+
     [Required]
     [StringLength(100, MinimumLength = 3)]
     public string Login { get; init; } = string.Empty;

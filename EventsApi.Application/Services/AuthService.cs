@@ -34,12 +34,15 @@ public class AuthService : IAuthService
         if (string.IsNullOrEmpty(request.Password))
             throw new DomainValidationException("Password is required");
 
+        if (request.Role is { } requestedRole && !Enum.IsDefined(requestedRole))
+            throw new DomainValidationException("Unknown role");
+
         var login = request.Login.Trim();
 
         if (await _userRepository.ExistsByLoginAsync(login, cancellationToken))
             throw new UserAlreadyExistsException(login);
 
-        var user = User.Create(login, _passwordHasher.Hash(request.Password), Role.User);
+        var user = User.Create(login, _passwordHasher.Hash(request.Password), request.Role ?? Role.User);
 
         await _userRepository.AddAsync(user, cancellationToken);
         await _userRepository.SaveChangesAsync(cancellationToken);

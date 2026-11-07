@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using EventsApi.Presentation.Extensions;
 using EventsApi.Application.Dto;
 using EventsApi.Application.Services;
 using EventsApi.Domain.Exceptions;
@@ -17,6 +19,7 @@ public class BookingsController : ControllerBase
     }
 
     // POST /bookings/{id}/cancel
+    [Authorize]
     [HttpPost("{id:guid}/cancel")]
     [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -24,11 +27,11 @@ public class BookingsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BookingResponse>> Cancel(Guid id, CancellationToken cancellationToken)
     {
-        // TODO: use the authenticated user's id and role once JWT auth is added
+        // Identity and role come from the validated JWT
         var cancelled = await _bookingService.CancelBookingAsync(
             id,
-            EventsApi.Domain.Entities.SystemUser.Id,
-            isAdmin: false,
+            User.GetUserId(),
+            isAdmin: User.IsAdmin(),
             cancellationToken);
 
         return Ok(cancelled);

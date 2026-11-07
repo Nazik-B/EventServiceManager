@@ -48,6 +48,7 @@ public class EventsController : ControllerBase
     }
 
     // POST /events
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
@@ -56,6 +57,7 @@ public class EventsController : ControllerBase
     }
 
     // PUT /events/{id}
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
@@ -69,6 +71,7 @@ public class EventsController : ControllerBase
     }
 
     // DELETE /events/{id}
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

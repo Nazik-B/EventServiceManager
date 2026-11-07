@@ -18,9 +18,9 @@ public class BookingsController : ControllerBase
         _bookingService = bookingService;
     }
 
-    // POST /bookings/{id}/cancel
+    // DELETE /bookings/{id}
     [Authorize]
-    [HttpPost("{id:guid}/cancel")]
+    [HttpDelete("{id:guid}")]
     [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -37,6 +37,7 @@ public class BookingsController : ControllerBase
         return Ok(cancelled);
     }
     // GET /bookings/{id}
+    [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {

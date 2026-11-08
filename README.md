@@ -1,11 +1,12 @@
 # Event Service Manager API
 
-Учебный проект ASP.NET Core Web API для управления событиями (Event). Реализован CRUD, валидация входных данных, фильтрация, пагинация, централизованная обработка ошибок и документация через Swagger.
+Учебный проект ASP.NET Core Web API для управления событиями (Event). Реализован CRUD, валидация входных данных, фильтрация, пагинация, централизованная обработка ошибок и документация через Swagger. Доступ к API защищён JWT-аутентификацией с ролями `User` и `Admin`.
 
 ## Стек технологий
 
 - .NET 10 / ASP.NET Core Web API
 - Swashbuckle.AspNetCore (Swagger UI)
+- JWT Bearer-аутентификация (`Microsoft.AspNetCore.Authentication.JwtBearer`)
 - Entity Framework Core
 - Npgsql.EntityFrameworkCore.PostgreSQL
 - EF Core Migrations (`dotnet-ef`)
@@ -30,8 +31,8 @@ EventServiceManager/
 
 | Слой | Содержимое | Зависит от |
 |---|---|---|
-| `EventsApi.Domain` | Сущности `Event`, `Booking`, `BookingStatus`; исключения `NotFoundException`, `NoAvailableSeatsException`, `DomainValidationException` | ни от чего |
-| `EventsApi.Application` | DTO; интерфейсы `IEventRepository`, `IBookingRepository`; сервисы `EventService`, `BookingService`, `BookingProcessingService`; метод `AddApplication()` | Domain |
+| `EventsApi.Domain` | Сущности `Event`, `Booking`, `BookingStatus`; сущность `User` и роли; исключения `NotFoundException`, `NoAvailableSeatsException`, `DomainValidationException`, `PastEventBookingException`, `ActiveBookingsLimitExceededException` | ни от чего |
+| `EventsApi.Application` | DTO; интерфейсы `IEventRepository`, `IBookingRepository`; сервисы `EventService`, `BookingService`, `BookingProcessingService`, `AuthService`; метод `AddApplication()` | Domain |
 | `EventsApi.Infrastructure` | `AppDbContext`, конфигурации и конвертеры EF Core; реализации репозиториев; миграции; `BookingProcessingBackgroundService`; методы `AddInfrastructure()` и `ApplyMigrations()` | Application, Domain |
 | `EventsApi.Presentation` | Контроллеры, `ExceptionHandlingMiddleware`, `ExceptionMapper`, `Program.cs` (composition root) | Application, Infrastructure |
 
@@ -39,7 +40,7 @@ EventServiceManager/
 
 - Application не зависит от Infrastructure: интерфейсы репозиториев лежат в Application, реализации — в Infrastructure.
 - Контроллеры только принимают HTTP-запрос, вызывают сервис Application и возвращают ответ, бизнес-логики в них нет.
-- Доменные исключения превращаются в HTTP-статусы в `ExceptionMapper` (Presentation): `NotFoundException` → 404, `NoAvailableSeatsException` → 409, ошибки валидации → 400.
+- Доменные исключения превращаются в HTTP-статусы в `ExceptionMapper` (Presentation): `NotFoundException` → 404, `NoAvailableSeatsException` и `ActiveBookingsLimitExceededException` → 409, ошибки валидации и бронь прошедшего события → 400, доступ к чужой брони → 403.
 - `Program.cs` только регистрирует зависимости через `AddApplication()` и `AddInfrastructure(...)`.
 - Тестовые проекты ссылаются на Application, Domain и Infrastructure, но не на Presentation.
 
@@ -56,12 +57,12 @@ EventServiceManager/
 
 ## Запуск проекта
 
-Клонируйте репозиторий и перейдите в ветку `sprint-7`, где ведётся текущая разработка:
+Клонируйте репозиторий и перейдите в ветку `sprint-8`, где ведётся текущая разработка:
 
 ```bash
 git clone <URL_репозитория>
 cd EventServiceManager
-git checkout sprint-7
+git checkout sprint-8
 ```
 
 ### Запуск PostgreSQL через Docker
@@ -196,25 +197,97 @@ dotnet run
 
 ## Эндпоинты API
 
+### Auth
+
+| Метод | URL | Описание | Успех | Ошибка |
+|---|---|---|---|---|
+| POST | /auth/register | Регистрация пользователя (необязательное поле `role`) | 200 OK | 400 Bad Request |
+| POST | /auth/login | Получение JWT-токена | 200 OK | 401 Unauthorized |
+
 ### Events
 
-| Метод  | URL              | Описание                          | Успех         | Ошибка              |
-|--------|------------------|------------------------------------|---------------|----------------------|
-| GET    | /events          | Получить список событий (с фильтрацией и пагинацией) | 200 OK | — |
-| GET    | /events/{id}     | Получить событие по id             | 200 OK        | 404 Not Found        |
-| POST   | /events          | Создать новое событие              | 201 Created   | 400 Bad Request      |
-| PUT    | /events/{id}     | Обновить событие целиком           | 204 No Content| 404 Not Found, 400 Bad Request |
-| DELETE | /events/{id}     | Удалить событие                    | 204 No Content| 404 Not Found        |
+| Метод | URL | Описание | Доступ | Успех | Ошибка |
+|---|---|---|---|---|---|
+| GET | /events | Список событий (фильтры и пагинация) | все | 200 OK | — |
+| GET | /events/{id} | Событие по id | все | 200 OK | 404 Not Found |
+| POST | /events | Создать событие | Admin | 201 Created | 400, 401, 403 |
+| PUT | /events/{id} | Обновить событие целиком | Admin | 204 No Content | 400, 401, 403, 404 |
+| DELETE | /events/{id} | Удалить событие | Admin | 204 No Content | 401, 403, 404 |
 
 ### Bookings
 
-| Метод  | URL                     | Описание                                   | Успех          | Ошибка         |
-|--------|-------------------------|---------------------------------------------|----------------|----------------|
-| POST   | /events/{id}/book       | Создать бронь на указанное событие          | 202 Accepted   | 404 Not Found, 409 Conflict   |
-| GET    | /bookings/{id}          | Получить текущий статус брони по id         | 200 OK         | 404 Not Found  |
+| Метод | URL | Описание | Доступ | Успех | Ошибка |
+|---|---|---|---|---|---|
+| POST | /events/{id}/book | Создать бронь на событие | User, Admin | 202 Accepted | 400, 401, 404, 409 |
+| GET | /bookings/{id} | Статус брони | владелец, Admin | 200 OK | 401, 403, 404 |
+| DELETE | /bookings/{id} | Отменить бронь | владелец, Admin | 2xx | 400, 401, 403, 404 |
 
 `POST /events/{id}/book` возвращает заголовок `Location`, указывающий на `/bookings/{bookingId}` для отслеживания статуса созданной брони.
 `POST /events/{id}/book` возвращает `409 Conflict`, если событие существует, но свободных мест больше нет. Ошибка соответствует `NoAvailableSeatsException`.
+
+## Аутентификация и роли
+
+API использует JWT (Bearer). Токен выдаёт `POST /auth/login`, передаётся он в заголовке `Authorization: Bearer <токен>`. Токен действует один час, после этого нужно войти заново. Идентификатор и роль пользователя сервер берёт из claims токена, клиент не передаёт их в запросе.
+
+### Роли и права
+
+| Роль | Описание |
+|---|---|
+| `User` | Роль по умолчанию. Бронирует места, смотрит и отменяет свои брони. |
+| `Admin` | Всё, что может `User`, плюс создание, изменение и удаление событий. Может просматривать и отменять любые брони. |
+
+| Эндпоинт | Без токена | User | Admin |
+|---|---|---|---|
+| `POST /auth/register`, `POST /auth/login` | доступно | доступно | доступно |
+| `GET /events`, `GET /events/{id}` | доступно | доступно | доступно |
+| `POST /events`, `PUT /events/{id}`, `DELETE /events/{id}` | 401 | 403 | доступно |
+| `POST /events/{id}/book` | 401 | доступно | доступно |
+| `GET /bookings/{id}`, `DELETE /bookings/{id}` | 401 | только своя бронь, иначе 403 | любая бронь |
+
+### Регистрация и роль
+
+`POST /auth/register` принимает `login`, `password` и необязательное поле `role` (`User` или `Admin`). Без `role` создаётся `User`, неизвестное значение даёт `400`.
+
+> Возможность указать `role = "Admin"` при регистрации оставлена только для тестирования. В продакшне её нужно убрать: иначе любой пользователь сам станет администратором.
+
+### Правила бронирования
+
+- Нельзя забронировать событие, которое уже началось: `400 Bad Request`.
+- У одного пользователя не может быть больше 10 активных броней (`Pending` и `Confirmed`): иначе `409 Conflict`, бронь не создаётся. Лимиты разных пользователей независимы.
+- Отклонённые и отменённые брони в лимит не входят.
+- Отмена брони (`DELETE /bookings/{id}`) переводит её в `Cancelled` и возвращает место в `AvailableSeats`. Отменить уже отменённую или отклонённую бронь нельзя.
+
+## Получение JWT-токена через Swagger
+
+1. Запустите API и откройте `http://localhost:5102/swagger`.
+2. Выполните `POST /auth/register`, например `{"login": "user1", "password": "Passw0rd!"}`. Для администратора добавьте `"role": "Admin"`.
+3. Выполните `POST /auth/login` с теми же данными и скопируйте токен из ответа без кавычек.
+4. Нажмите **Authorize**, вставьте токен в поле Value (слово `Bearer` писать не нужно), нажмите Authorize и Close.
+5. Теперь запросы из Swagger уходят с заголовком `Authorization`. Чтобы сменить пользователя, нажмите Authorize → Logout и вставьте другой токен.
+
+Проверка: `POST /events` без токена возвращает `401`, с токеном обычного пользователя `403`, с токеном администратора успех.
+
+## Настройка секрета JWT
+
+Параметры токена задаются в `EventsApi.Presentation/appsettings.json`:
+
+```json
+{
+  "Jwt": {
+    "Issuer": "EventsApi",
+    "Audience": "EventsApi.Clients",
+    "Secret": "<длинная-случайная-строка>",
+    "ExpiresMinutes": 60
+  }
+}
+```
+
+Секрет подписывает токены: тот, кто его знает, может выпустить токен с любой ролью. Поэтому:
+
+- В продакшне используйте случайную строку не короче 32 символов (для HS256 нужно минимум 256 бит) и не храните её в репозитории.
+- Передавайте секрет через переменную окружения: для секции `Jwt` и ключа `Secret` это `Jwt__Secret`.
+- Для локальной разработки подойдут user-secrets: `dotnet user-secrets set "Jwt:Secret" "<значение>" --project EventsApi.Presentation`.
+- Значение из `appsettings.json` годится только для учебного запуска. При смене секрета все выданные токены перестают действовать.
 
 ## GET /events — параметры фильтрации и пагинации
 
@@ -260,7 +333,7 @@ dotnet run
 |---|---|---|
 | `id` | `Guid` | Уникальный идентификатор брони. |
 | `eventId` | `Guid` | Идентификатор события, к которому относится бронь. |
-| `status` | `string` | Текущий статус брони: `Pending`, `Confirmed` или `Rejected`. |
+| `status` | `string` | Текущий статус брони: `Pending`, `Confirmed`, `Rejected` или `Cancelled`. |
 | `createdAt` | `DateTime` | Момент создания брони (UTC). |
 | `processedAt` | `DateTime?` | Момент завершения обработки брони фоновым сервисом (UTC). `null`, пока бронь находится в статусе `Pending`. |
 
@@ -269,6 +342,7 @@ dotnet run
 - **`Pending`** — бронь создана и ожидает обработки фоновым сервисом. Начальный статус для любой новой брони.
 - **`Confirmed`** — бронь успешно обработана и подтверждена.
 - **`Rejected`** — бронь отклонена во время фоновой обработки. Если для брони ранее резервировалось место, оно освобождается и возвращается в `AvailableSeats`.
+- **`Cancelled`** — бронь отменена владельцем или администратором через `DELETE /bookings/{id}`; занятое место возвращается в `AvailableSeats`.
 
 ## Синхронизация и конкурентность
 
@@ -300,10 +374,21 @@ dotnet run
 
 ## Примеры запросов (curl)
 
+Методы создания, изменения и удаления событий и все операции с бронями требуют токена. Сначала войдите и сохраните токен в переменную (ответ `/auth/login` — токен или JSON с токеном; при JSON извлеките значение поля с токеном):
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:5102/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"admin_test","password":"Passw0rd!"}')
+```
+
+Создание событий доступно только роли `Admin`, поэтому для примеров ниже используйте токен администратора.
+
 ### Создание события
 
 ```bash
 curl -X POST http://localhost:5102/events \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title":"Standup","description":"Daily meeting","startAt":"2026-07-09T10:00:00","endAt":"2026-07-09T10:15:00","totalSeats":10}'
 ```
@@ -340,6 +425,7 @@ curl http://localhost:5102/events/EVENT_ID
 
 ```bash
 curl -X PUT http://localhost:5102/events/EVENT_ID \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title":"Updated Standup","startAt":"2026-07-09T11:00:00","endAt":"2026-07-09T11:30:00"}'
 ```
@@ -347,7 +433,8 @@ curl -X PUT http://localhost:5102/events/EVENT_ID \
 ### Удаление события
 
 ```bash
-curl -X DELETE http://localhost:5102/events/EVENT_ID
+curl -X DELETE http://localhost:5102/events/EVENT_ID \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Сквозной сценарий бронирования
@@ -355,36 +442,48 @@ curl -X DELETE http://localhost:5102/events/EVENT_ID
 ```bash
 # 1. Создать событие
 curl -i -X POST http://localhost:5102/events \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title":"Final Check","startAt":"2026-08-10T10:00:00","endAt":"2026-08-10T11:00:00","totalSeats": 3}'
 # → 201 Created, тело содержит "id" события (EVENT_ID)
 
 # 2. Создать бронь на это событие
-curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book \
+  -H "Authorization: Bearer $TOKEN"
 # → 202 Accepted, Location: /bookings/BOOKING_ID, status: "Pending"
 
 # 3. Сразу проверить статус
-curl -i http://localhost:5102/bookings/BOOKING_ID
+curl -i http://localhost:5102/bookings/BOOKING_ID \
+  -H "Authorization: Bearer $TOKEN"
 # → 200 OK, status: "Pending", processedAt: null
 
 # 4. Подождать несколько секунд и проверить снова
 sleep 10
-curl -i http://localhost:5102/bookings/BOOKING_ID
+curl -i http://localhost:5102/bookings/BOOKING_ID \
+  -H "Authorization: Bearer $TOKEN"
 # → 200 OK, status: "Confirmed", processedAt заполнен
 
 # 5. Четвёртая бронь отклоняется
 
-curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book \
+  -H "Authorization: Bearer $TOKEN"
 # → 202 Accepted
 
-curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book \
+  -H "Authorization: Bearer $TOKEN"
 # → 202 Accepted
 
-curl -i -X POST http://localhost:5102/events/EVENT_ID/book
+curl -i -X POST http://localhost:5102/events/EVENT_ID/book \
+  -H "Authorization: Bearer $TOKEN"
 # → 409 Conflict
+
+# 6. Отменить бронь
+curl -i -X DELETE http://localhost:5102/bookings/BOOKING_ID \
+  -H "Authorization: Bearer $TOKEN"
+# → успешный ответ, повторный GET покажет status: "Cancelled", место возвращено
 ```
 
-Тот же сценарий можно выполнить через Swagger UI (`/swagger`): последовательно вызвать `POST /events`, `POST /events/{id}/book` и несколько раз `GET /bookings/{id}` с задержкой, наблюдая переход статуса из `Pending` в `Confirmed`.
+Тот же сценарий можно выполнить через Swagger UI (`/swagger`): предварительно авторизовавшись (см. «Получение JWT-токена через Swagger»): последовательно вызвать `POST /events` (токен администратора), `POST /events/{id}/book`, несколько раз `GET /bookings/{id}` с задержкой, наблюдая переход статуса из `Pending` в `Confirmed`, и `DELETE /bookings/{id}`.
 
 После трёх успешных броней `availableSeats` равен `0`. Четвёртый запрос не создаёт бронь и возвращает `409 Conflict`, что предотвращает овербукинг.
 
@@ -407,9 +506,11 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 | Статус | Когда возвращается |
 |---|---|
-| 400 Bad Request | Ошибки валидации входных данных (пустой Title, EndAt раньше StartAt, отсутствующие обязательные поля) |
+| 400 Bad Request | Ошибки валидации входных данных (пустой Title, EndAt раньше StartAt, отсутствующие обязательные поля), неизвестная роль при регистрации, бронь уже начавшегося события, отмена брони в статусе `Cancelled` или `Rejected` |
+| 401 Unauthorized | Токен не передан, недействителен или просрочен; неверный логин или пароль |
+| 403 Forbidden | Недостаточно прав: роль `User` вызывает методы администратора или обращается к чужой брони |
 | 404 Not Found | Событие или бронь с указанным ID не найдены (GET, PUT, DELETE, POST /events/{id}/book) |
-| 409 Conflict | На событии нет свободных мест при попытке создать бронь (NoAvailableSeatsException) |
+| 409 Conflict | На событии нет свободных мест (NoAvailableSeatsException) или у пользователя уже 10 активных броней (ActiveBookingsLimitExceededException) |
 | 500 Internal Server Error | Непредвиденные ошибки сервера |
 
 ### Поля ответа об ошибке
@@ -429,7 +530,7 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book
 
 В решении два тестовых проекта:
 
-- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони с существующим и несуществующим событием). Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
+- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) `BookingService` (создание брони, места, конкурентные запросы, несуществующее и удалённое событие), правила бронирования (`BookingRulesTests`: бронь прошедшего события, лимит активных броней, независимость лимитов пользователей), отмену брони (`BookingCancellationTests`), `JwtTokenService`, хеширование паролей и доменные модели `User` и `Booking`. Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
 - `EventsApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
 
 ### Интеграционные тесты и Docker

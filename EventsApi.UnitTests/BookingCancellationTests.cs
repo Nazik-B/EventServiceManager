@@ -157,7 +157,7 @@ public class BookingCancellationTests
         await bookings.CancelBookingAsync(booking.Id, owner, isAdmin: false);
 
         var result = await processing.ProcessBookingAsync(booking.Id);
-        var after = await bookings.GetBookingByIdAsync(booking.Id);
+        var after = await bookings.GetBookingByIdAsync(booking.Id, Guid.NewGuid(), isAdmin: true);
 
         Assert.Equal(BookingProcessingResult.Skipped, result);
         Assert.Equal(BookingStatus.Cancelled, after!.Status);

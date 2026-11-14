@@ -70,14 +70,25 @@ public class BookingService : IBookingService
         }
     }
 
-    public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId)
+   public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId,Guid userId,bool isAdmin)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId);
-        return booking is null ? null : ToResponse(booking);
+
+        if (booking is null)
+        {
+            return null;
+        }
+
+        if (booking.UserId != userId && !isAdmin)
+        {
+            throw new ForbiddenOperationException(
+                "You can view only your own bookings");
+        }
+
+        return ToResponse(booking);
     }
 
-    public async Task<IEnumerable<Booking>> GetPendingBookingsAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken = default)
     {
         return await _bookingRepository.GetPendingAsync(cancellationToken);
     }

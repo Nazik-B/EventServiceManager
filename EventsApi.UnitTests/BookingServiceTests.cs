@@ -96,7 +96,7 @@ public class BookingServiceTests
         var created = await bookingService.CreateBookingAsync(
             createdEvent.Id, TestUserId);
 
-        var found = await bookingService.GetBookingByIdAsync(created.Id);
+        var found = await bookingService.GetBookingByIdAsync(created.Id, TestUserId, isAdmin: false);
 
         Assert.NotNull(found);
         Assert.Equal(created.Id, found!.Id);
@@ -115,8 +115,7 @@ public class BookingServiceTests
         var eventService = scope.ServiceProvider
             .GetRequiredService<IEventService>();
 
-        var found = await bookingService.GetBookingByIdAsync(
-            Guid.NewGuid());
+        var found = await bookingService.GetBookingByIdAsync(Guid.NewGuid(), TestUserId, isAdmin: false);
 
         Assert.Null(found);
     }
@@ -149,7 +148,7 @@ public class BookingServiceTests
             processedAt,
             CancellationToken.None);
 
-        var updated = await bookingService.GetBookingByIdAsync(created.Id);
+        var updated = await bookingService.GetBookingByIdAsync(created.Id, TestUserId, isAdmin: false);
 
         Assert.NotNull(updated);
         Assert.Equal(finalStatus, updated!.Status);
@@ -455,5 +454,53 @@ public class BookingServiceTests
 
         Assert.NotNull(updatedEvent);
         Assert.Equal(0, updatedEvent!.AvailableSeats);
+    }
+    [Fact]
+    public async Task GetBookingByIdAsync_ReturnsBooking_ForOwner()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
+
+        var createdEvent = await eventService.CreateAsync(BuildEventRequest());
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+
+        var found = await bookingService.GetBookingByIdAsync(
+            booking.Id, TestUserId, isAdmin: false);
+
+        Assert.NotNull(found);
+        Assert.Equal(booking.Id, found!.Id);
+    }
+
+    [Fact]
+    public async Task GetBookingByIdAsync_ThrowsForbidden_WhenUserIsNotOwner()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
+
+        var createdEvent = await eventService.CreateAsync(BuildEventRequest());
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+
+        await Assert.ThrowsAsync<ForbiddenOperationException>(
+            () => bookingService.GetBookingByIdAsync(
+                booking.Id, Guid.NewGuid(), isAdmin: false));
+    }
+
+    [Fact]
+    public async Task GetBookingByIdAsync_ReturnsAnyBooking_ForAdmin()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
+
+        var createdEvent = await eventService.CreateAsync(BuildEventRequest());
+        var booking = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+
+        var found = await bookingService.GetBookingByIdAsync(
+            booking.Id, Guid.NewGuid(), isAdmin: true);
+
+        Assert.NotNull(found);
+        Assert.Equal(booking.Id, found!.Id);
     }
 }

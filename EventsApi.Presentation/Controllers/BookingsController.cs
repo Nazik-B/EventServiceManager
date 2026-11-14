@@ -39,9 +39,16 @@ public class BookingsController : ControllerBase
     // GET /bookings/{id}
     [Authorize]
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {
-        var booking = await _bookingService.GetBookingByIdAsync(id);
+        var booking = await _bookingService.GetBookingByIdAsync(
+            id,
+            User.GetUserId(),
+            isAdmin: User.IsAdmin());
+
         if (booking is null)
         {
             throw new NotFoundException($"Booking with id {id} was not found");

@@ -37,7 +37,7 @@ public class EventRepositoryTests : IntegrationTestBase
         var repo = CreateRepository();
         var ev = CreateEvent("Концерт", DateTime.UtcNow, DateTime.UtcNow.AddHours(2));
         await repo.AddAsync(ev);
-        await repo.SaveChangesAsync();        
+        await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
 
         var result = await repo.GetByIdAsync(ev.Id);
@@ -47,7 +47,7 @@ public class EventRepositoryTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetByIdForUpdateAsync_ReturnsTrackedEntity()
+    public async Task GetByIdTrackedAsync_ReturnsTrackedEntity()
     {
         var repo = CreateRepository();
         var ev = CreateEvent("Концерт", DateTime.UtcNow, DateTime.UtcNow.AddHours(2));
@@ -55,7 +55,7 @@ public class EventRepositoryTests : IntegrationTestBase
         await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
 
-        var result = await repo.GetByIdForUpdateAsync(ev.Id);
+        var result = await repo.GetByIdTrackedAsync(ev.Id);
 
         Assert.NotNull(result);
         Assert.Equal(EntityState.Unchanged, DbContext.Entry(result!).State);
@@ -69,7 +69,7 @@ public class EventRepositoryTests : IntegrationTestBase
         await repo.AddAsync(ev);
         await repo.SaveChangesAsync();
 
-        var tracked = await repo.GetByIdForUpdateAsync(ev.Id);
+        var tracked = await repo.GetByIdTrackedAsync(ev.Id);
         repo.Delete(tracked!);
         await repo.SaveChangesAsync();
 

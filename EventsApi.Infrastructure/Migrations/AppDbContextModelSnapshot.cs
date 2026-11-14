@@ -22,7 +22,7 @@ namespace EventsApi.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("EventsApi.Models.Booking", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -41,14 +41,25 @@ namespace EventsApi.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EventId");
 
+                    b.HasIndex("UserId");
+
                     b.ToTable("bookings", (string)null);
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Event", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Event", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -74,23 +85,70 @@ namespace EventsApi.Infrastructure.Migrations
                     b.Property<int>("TotalSeats")
                         .HasColumnType("integer");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.ToTable("events", (string)null);
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Booking", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.User", b =>
                 {
-                    b.HasOne("EventsApi.Models.Event", "Event")
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Login")
+                        .IsUnique();
+
+                    b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("EventsApi.Domain.Entities.Booking", b =>
+                {
+                    b.HasOne("EventsApi.Domain.Entities.Event", "Event")
                         .WithMany("Bookings")
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EventsApi.Domain.Entities.User", "User")
+                        .WithMany("Bookings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Event");
+
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EventsApi.Models.Event", b =>
+            modelBuilder.Entity("EventsApi.Domain.Entities.Event", b =>
+                {
+                    b.Navigation("Bookings");
+                });
+
+            modelBuilder.Entity("EventsApi.Domain.Entities.User", b =>
                 {
                     b.Navigation("Bookings");
                 });

@@ -1,6 +1,9 @@
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EventsApi.Presentation.Extensions;
 using EventsApi.Application.Dto;
 using EventsApi.Application.Services;
+using EventsApi.Domain.Entities;
 using EventsApi.Domain.Exceptions;
 
 namespace EventsApi.Controllers;
@@ -45,6 +48,7 @@ public class EventsController : ControllerBase
     }
 
     // POST /events
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
@@ -53,6 +57,7 @@ public class EventsController : ControllerBase
     }
 
     // PUT /events/{id}
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
@@ -66,6 +71,7 @@ public class EventsController : ControllerBase
     }
 
     // DELETE /events/{id}
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -79,11 +85,12 @@ public class EventsController : ControllerBase
     }
 
     // POST /events/{id}/book
+    [Authorize]
     [HttpPost("{id:guid}/book")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Book(Guid id)
     {
-        var booking = await _bookingService.CreateBookingAsync(id);
+        var booking = await _bookingService.CreateBookingAsync(id, User.GetUserId());
 
         return Accepted($"/bookings/{booking.Id}", booking);
     }

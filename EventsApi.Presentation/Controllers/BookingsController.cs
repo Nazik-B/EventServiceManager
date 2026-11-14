@@ -1,4 +1,6 @@
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EventsApi.Presentation.Extensions;
 using EventsApi.Application.Dto;
 using EventsApi.Application.Services;
 using EventsApi.Domain.Exceptions;
@@ -16,7 +18,26 @@ public class BookingsController : ControllerBase
         _bookingService = bookingService;
     }
 
+    // DELETE /bookings/{id}
+    [Authorize]
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BookingResponse>> Cancel(Guid id, CancellationToken cancellationToken)
+    {
+        // Identity and role come from the validated JWT
+        var cancelled = await _bookingService.CancelBookingAsync(
+            id,
+            User.GetUserId(),
+            isAdmin: User.IsAdmin(),
+            cancellationToken);
+
+        return Ok(cancelled);
+    }
     // GET /bookings/{id}
+    [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {

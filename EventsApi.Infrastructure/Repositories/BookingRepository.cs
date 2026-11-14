@@ -1,4 +1,4 @@
-using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using EventsApi.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -25,7 +25,7 @@ public sealed class BookingRepository : IBookingRepository
                 cancellationToken);
     }
 
-    public Task<Booking?> GetByIdForUpdateAsync(
+    public Task<Booking?> GetByIdTrackedAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
@@ -100,10 +100,28 @@ public sealed class BookingRepository : IBookingRepository
             cancellationToken);
     }
 
-    public Task<int> SaveChangesAsync(
+    public Task<int> CountActiveByUserAsync(
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        return _dbContext.Bookings.CountAsync(
+            booking => booking.UserId == userId
+                && (booking.Status == BookingStatus.Pending
+                    || booking.Status == BookingStatus.Confirmed),
+            cancellationToken);
+    }
+
+    public async Task<int> SaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new EventsApi.Domain.Exceptions.ConcurrencyConflictException(ex);
+        }
     }
 
     public async Task<IReadOnlyList<Guid>> GetPendingIdsAsync(

@@ -18,11 +18,12 @@ public static class TestDbContextFactory
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
-        
+
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventServiceImplementation>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<IBookingProcessingService, BookingProcessingService>();
 
         return services.BuildServiceProvider();
     }

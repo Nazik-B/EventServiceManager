@@ -1,4 +1,4 @@
-using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
 using EventsApi.Application.Dto;
@@ -11,8 +11,10 @@ namespace EventsApi.UnitTests;
 
 public class BookingServiceTests
 {
+    private static readonly Guid TestUserId = Guid.NewGuid();
+
     private readonly ServiceProvider _serviceProvider;
-    
+
     public BookingServiceTests()
     {
         _serviceProvider = TestDbContextFactory.CreateServiceProvider();
@@ -25,8 +27,8 @@ public class BookingServiceTests
         return new CreateEventRequest
         {
             Title = title,
-            StartAt = DateTime.Parse("2026-08-01T10:00:00"),
-            EndAt = DateTime.Parse("2026-08-01T11:00:00"),
+            StartAt = DateTime.UtcNow.AddDays(30),
+            EndAt = DateTime.UtcNow.AddDays(30).AddHours(1),
             TotalSeats = totalSeats
         };
     }
@@ -46,7 +48,7 @@ public class BookingServiceTests
             BuildEventRequest());
 
         var booking = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         Assert.NotEqual(Guid.Empty, booking.Id);
         Assert.Equal(createdEvent.Id, booking.EventId);
@@ -68,9 +70,9 @@ public class BookingServiceTests
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
 
-        var first = await bookingService.CreateBookingAsync(createdEvent.Id);
-        var second = await bookingService.CreateBookingAsync(createdEvent.Id);
-        var third = await bookingService.CreateBookingAsync(createdEvent.Id);
+        var first = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+        var second = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+        var third = await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
 
         Assert.NotEqual(first.Id, second.Id);
         Assert.NotEqual(second.Id, third.Id);
@@ -92,7 +94,7 @@ public class BookingServiceTests
             BuildEventRequest());
 
         var created = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         var found = await bookingService.GetBookingByIdAsync(created.Id);
 
@@ -137,7 +139,7 @@ public class BookingServiceTests
             BuildEventRequest());
 
         var created = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         var processedAt = DateTime.UtcNow;
 
@@ -168,7 +170,7 @@ public class BookingServiceTests
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
 
-        await bookingService.CreateBookingAsync(createdEvent.Id);
+        await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
 
         var updatedEvent = await eventService.GetByIdAsync(createdEvent.Id);
 
@@ -190,9 +192,9 @@ public class BookingServiceTests
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 3));
 
-        await bookingService.CreateBookingAsync(createdEvent.Id);
-        await bookingService.CreateBookingAsync(createdEvent.Id);
-        await bookingService.CreateBookingAsync(createdEvent.Id);
+        await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+        await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
+        await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
 
         var updatedEvent = await eventService.GetByIdAsync(createdEvent.Id);
 
@@ -214,10 +216,10 @@ public class BookingServiceTests
         var createdEvent = await eventService.CreateAsync(
             BuildEventRequest(totalSeats: 1));
 
-        await bookingService.CreateBookingAsync(createdEvent.Id);
+        await bookingService.CreateBookingAsync(createdEvent.Id, TestUserId);
 
         await Assert.ThrowsAsync<NoAvailableSeatsException>(
-            () => bookingService.CreateBookingAsync(createdEvent.Id));
+            () => bookingService.CreateBookingAsync(createdEvent.Id, TestUserId));
     }
 
     [Fact]
@@ -232,7 +234,7 @@ public class BookingServiceTests
             .GetRequiredService<IEventService>();
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => bookingService.CreateBookingAsync(Guid.NewGuid()));
+            () => bookingService.CreateBookingAsync(Guid.NewGuid(), TestUserId));
     }
 
     [Fact]
@@ -252,7 +254,7 @@ public class BookingServiceTests
         await eventService.DeleteAsync(createdEvent.Id);
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => bookingService.CreateBookingAsync(createdEvent.Id));
+            () => bookingService.CreateBookingAsync(createdEvent.Id, TestUserId));
     }
 
     [Fact]
@@ -270,7 +272,7 @@ public class BookingServiceTests
             BuildEventRequest(totalSeats: 1));
 
         var booking = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         await bookingService.UpdateBookingStatusAsync(
             booking.Id,
@@ -304,7 +306,7 @@ public class BookingServiceTests
             BuildEventRequest(totalSeats: 1));
 
         var rejectedBooking = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         await bookingService.UpdateBookingStatusAsync(
             rejectedBooking.Id,
@@ -315,7 +317,7 @@ public class BookingServiceTests
         await eventService.ReleaseSeatAsync(createdEvent.Id);
 
         var newBooking = await bookingService.CreateBookingAsync(
-            createdEvent.Id);
+            createdEvent.Id, TestUserId);
 
         var updatedEvent = await eventService.GetByIdAsync(
             createdEvent.Id);
@@ -356,7 +358,7 @@ public class BookingServiceTests
                 try
                 {
                     var booking = await bookingService
-                        .CreateBookingAsync(eventId);
+                        .CreateBookingAsync(eventId, TestUserId);
 
                     return (Booking: booking, Exception: (Exception?)null);
                 }
@@ -429,7 +431,7 @@ public class BookingServiceTests
                 var bookingService = requestScope.ServiceProvider
                     .GetRequiredService<IBookingService>();
 
-                return await bookingService.CreateBookingAsync(eventId);
+                return await bookingService.CreateBookingAsync(eventId, TestUserId);
             }))
             .ToArray();
 

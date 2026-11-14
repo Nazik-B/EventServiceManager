@@ -21,7 +21,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         return ev;
     }
 
-    private static Booking CreateBooking(Guid eventId) => Booking.Create(eventId);
+    private static Booking CreateBooking(Guid eventId) => Booking.Create(eventId, SystemUser.Id);
 
     [Fact]
     public async Task AddAsync_SavesBookingToDatabase()
@@ -48,7 +48,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
-        
+
 
         var result = await repo.GetByIdAsync(booking.Id);
 
@@ -68,7 +68,7 @@ public class BookingRepositoryTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetByIdForUpdateAsync_ReturnsTrackedEntity()
+    public async Task GetByIdTrackedAsync_ReturnsTrackedEntity()
     {
         var repo = CreateRepository();
         var ev = await SeedEventAsync();
@@ -77,7 +77,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.SaveChangesAsync();
         DbContext.ChangeTracker.Clear();
 
-        var result = await repo.GetByIdForUpdateAsync(booking.Id);
+        var result = await repo.GetByIdTrackedAsync(booking.Id);
 
         Assert.NotNull(result);
         Assert.Equal(EntityState.Unchanged, DbContext.Entry(result!).State);
@@ -114,7 +114,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
 
-        var tracked = await repo.GetByIdForUpdateAsync(booking.Id);
+        var tracked = await repo.GetByIdTrackedAsync(booking.Id);
         Assert.NotNull(tracked);
         tracked.Status = BookingStatus.Confirmed;
         tracked.ProcessedAt = DateTime.UtcNow;
@@ -138,7 +138,7 @@ public class BookingRepositoryTests : IntegrationTestBase
         await repo.AddAsync(booking);
         await repo.SaveChangesAsync();
 
-        var tracked = await repo.GetByIdForUpdateAsync(booking.Id);
+        var tracked = await repo.GetByIdTrackedAsync(booking.Id);
         await repo.DeleteAsync(tracked!);
         await repo.SaveChangesAsync();
 

@@ -1,15 +1,16 @@
-using EventsApi.Domain.Entities;
+﻿using EventsApi.Domain.Entities;
 
 namespace EventsApi.Application.Repositories;
 
 public interface IBookingRepository
 {
     Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<Booking?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Booking?> GetByIdTrackedAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetPendingAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Guid>> GetPendingIdsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Booking>> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken = default);
+    Task<int> CountActiveByUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
     Task AddAsync(Booking entity, CancellationToken cancellationToken = default);
 

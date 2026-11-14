@@ -109,7 +109,13 @@ EventsApi.Presentation/appsettings.json
 
 ### Схема базы данных и миграции
 
-Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `EventsApi.Infrastructure`, и именно они определяют таблицы `events` и `bookings`, первичные ключи, внешний ключ `bookings.EventId → events.Id` и индекс по `EventId`. `Database.EnsureCreated()` не используется: он несовместим с миграциями.
+Схема базы данных управляется миграциями EF Core. Файлы миграций лежат в папке `Migrations` проекта `EventsApi.Infrastructure`, и именно они определяют таблицы `events`, `bookings` и `users`, их первичные ключи, а также связи и индексы:
+
+- внешний ключ `bookings.EventId → events.Id` с каскадным удалением (при удалении события удаляются его брони) и индекс по `EventId`;
+- внешний ключ `bookings.UserId → users.Id` с ограничением `Restrict` (пользователя нельзя удалить, пока у него есть брони) и индекс по `UserId`;
+- уникальный индекс по `users.Login`: два пользователя не могут иметь один логин (повторная регистрация возвращает `409 Conflict`).
+
+В таблице `users` хранятся логин (`Login`), хеш пароля (`PasswordHash`, SHA-256, сам пароль не сохраняется) и роль (`Role`: `User` или `Admin`). `Database.EnsureCreated()` не используется: он несовместим с миграциями.
 
 При старте API `Program.cs` вызывает `app.Services.ApplyMigrations()` (метод расширения из Infrastructure), который выполняет `Database.Migrate()`: все неприменённые миграции применяются к базе автоматически. Поэтому для локального запуска достаточно поднять PostgreSQL и выполнить `dotnet run`. Команду `dotnet ef database update` используйте, когда нужно применить миграции вручную, не запуская API.
 
@@ -220,7 +226,7 @@ dotnet run
 |---|---|---|---|---|---|
 | POST | /events/{id}/book | Создать бронь на событие | User, Admin | 202 Accepted | 400, 401, 404, 409 |
 | GET | /bookings/{id} | Статус брони | владелец, Admin | 200 OK | 401, 403, 404 |
-| DELETE | /bookings/{id} | Отменить бронь | владелец, Admin | 200 OK (тело брони) | 400, 401, 403, 404 |
+| DELETE | /bookings/{id} | Отменить бронь | владелец, Admin | 204 No Content | 400, 401, 403, 404 |
 
 `POST /events/{id}/book` возвращает заголовок `Location`, указывающий на `/bookings/{bookingId}` для отслеживания статуса созданной брони.
 `POST /events/{id}/book` возвращает `409 Conflict`, если событие существует, но свободных мест больше нет. Ошибка соответствует `NoAvailableSeatsException`.
@@ -257,7 +263,7 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 - Нельзя забронировать событие, которое уже началось: `400 Bad Request`.
 - У одного пользователя не может быть больше 10 активных броней (`Pending` и `Confirmed`): иначе `409 Conflict`, бронь не создаётся. Лимиты разных пользователей независимы.
 - Отклонённые и отменённые брони в лимит не входят.
-- Отмена брони (`DELETE /bookings/{id}`) переводит её в `Cancelled` и возвращает место в `AvailableSeats`. Отменить уже отменённую или отклонённую бронь нельзя.
+- Отмена брони (`DELETE /bookings/{id}`) переводит её в `Cancelled` и возвращает место в `AvailableSeats`. Отменить уже отменённую или отклонённую бронь нельзя. Успешная отмена возвращает `204 No Content` без тела; актуальный статус (`Cancelled`) можно получить через `GET /bookings/{id}`.
 
 ## Получение JWT-токена через Swagger
 
@@ -482,7 +488,7 @@ curl -i -X POST http://localhost:5102/events/EVENT_ID/book \
 # 6. Отменить бронь
 curl -i -X DELETE http://localhost:5102/bookings/BOOKING_ID \
   -H "Authorization: Bearer $TOKEN"
-# → успешный ответ, повторный GET покажет status: "Cancelled", место возвращено
+# → 204 No Content; повторный GET покажет status: "Cancelled", место возвращено
 ```
 
 Тот же сценарий можно выполнить через Swagger UI (`/swagger`): предварительно авторизовавшись (см. «Получение JWT-токена через Swagger»): последовательно вызвать `POST /events` (токен администратора), `POST /events/{id}/book`, несколько раз `GET /bookings/{id}` с задержкой, наблюдая переход статуса из `Pending` в `Confirmed`, и `DELETE /bookings/{id}`.

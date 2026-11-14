@@ -21,20 +21,20 @@ public class BookingsController : ControllerBase
     // DELETE /bookings/{id}
     [Authorize]
     [HttpDelete("{id:guid}")]
-    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<BookingResponse>> Cancel(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
     {
         // Identity and role come from the validated JWT
-        var cancelled = await _bookingService.CancelBookingAsync(
+        await _bookingService.CancelBookingAsync(
             id,
             User.GetUserId(),
             isAdmin: User.IsAdmin(),
             cancellationToken);
 
-        return Ok(cancelled);
+        return NoContent();
     }
     // GET /bookings/{id}
     [Authorize]

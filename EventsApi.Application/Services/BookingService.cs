@@ -70,7 +70,7 @@ public class BookingService : IBookingService
         }
     }
 
-   public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId,Guid userId,bool isAdmin)
+    public async Task<BookingResponse?> GetBookingByIdAsync(Guid bookingId, Guid userId, bool isAdmin)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId);
 

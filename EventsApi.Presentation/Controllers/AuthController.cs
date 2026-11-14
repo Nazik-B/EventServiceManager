@@ -17,15 +17,15 @@ public class AuthController : ControllerBase
 
     // POST /auth/register
     [HttpPost("register")]
-    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserResponse>> Register(
+    public async Task<IActionResult> Register(
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await _authService.RegisterAsync(request, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, user);
+        await _authService.RegisterAsync(request, cancellationToken);
+        return NoContent();
     }
 
     // POST /auth/login

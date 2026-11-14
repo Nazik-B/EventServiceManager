@@ -31,7 +31,7 @@ EventServiceManager/
 
 | Слой | Содержимое | Зависит от |
 |---|---|---|
-| `EventsApi.Domain` | Сущности `Event`, `Booking`, `BookingStatus`; сущность `User` и роли; исключения `NotFoundException`, `NoAvailableSeatsException`, `DomainValidationException`, `PastEventBookingException`, `ActiveBookingsLimitExceededException` | ни от чего |
+| `EventsApi.Domain` | Сущности `Event`, `Booking`, `BookingStatus`; сущность `User` и роли; исключения `NotFoundException`, `NoAvailableSeatsException`, `DomainValidationException`, `PastEventBookingException`, `ActiveBookingsLimitExceededException`, `InvalidCredentialsException`, `UserAlreadyExistsException`, `ForbiddenOperationException`, `ConcurrencyConflictException` | ни от чего |
 | `EventsApi.Application` | DTO; интерфейсы `IEventRepository`, `IBookingRepository`; сервисы `EventService`, `BookingService`, `BookingProcessingService`, `AuthService`; метод `AddApplication()` | Domain |
 | `EventsApi.Infrastructure` | `AppDbContext`, конфигурации и конвертеры EF Core; реализации репозиториев; миграции; `BookingProcessingBackgroundService`; методы `AddInfrastructure()` и `ApplyMigrations()` | Application, Domain |
 | `EventsApi.Presentation` | Контроллеры, `ExceptionHandlingMiddleware`, `ExceptionMapper`, `Program.cs` (composition root) | Application, Infrastructure |
@@ -40,7 +40,7 @@ EventServiceManager/
 
 - Application не зависит от Infrastructure: интерфейсы репозиториев лежат в Application, реализации — в Infrastructure.
 - Контроллеры только принимают HTTP-запрос, вызывают сервис Application и возвращают ответ, бизнес-логики в них нет.
-- Доменные исключения превращаются в HTTP-статусы в `ExceptionMapper` (Presentation): `NotFoundException` → 404, `NoAvailableSeatsException` и `ActiveBookingsLimitExceededException` → 409, ошибки валидации и бронь прошедшего события → 400, доступ к чужой брони → 403.
+- Доменные исключения превращаются в HTTP-статусы в `ExceptionMapper` (Presentation): `NotFoundException` → 404, ошибки валидации и `PastEventBookingException` → 400, `InvalidCredentialsException` → 401, `ForbiddenOperationException` → 403, `NoAvailableSeatsException`, `ActiveBookingsLimitExceededException`, `UserAlreadyExistsException` и `ConcurrencyConflictException` → 409.
 - `Program.cs` только регистрирует зависимости через `AddApplication()` и `AddInfrastructure(...)`.
 - Тестовые проекты ссылаются на Application, Domain и Infrastructure, но не на Presentation.
 
@@ -201,7 +201,7 @@ dotnet run
 
 | Метод | URL | Описание | Успех | Ошибка |
 |---|---|---|---|---|
-| POST | /auth/register | Регистрация пользователя (необязательное поле `role`) | 200 OK | 400 Bad Request |
+| POST | /auth/register | Регистрация пользователя (необязательное поле `role`) | 204 No Content | 400 Bad Request, 409 Conflict (логин занят) |
 | POST | /auth/login | Получение JWT-токена | 200 OK | 401 Unauthorized |
 
 ### Events
@@ -220,14 +220,14 @@ dotnet run
 |---|---|---|---|---|---|
 | POST | /events/{id}/book | Создать бронь на событие | User, Admin | 202 Accepted | 400, 401, 404, 409 |
 | GET | /bookings/{id} | Статус брони | владелец, Admin | 200 OK | 401, 403, 404 |
-| DELETE | /bookings/{id} | Отменить бронь | владелец, Admin | 2xx | 400, 401, 403, 404 |
+| DELETE | /bookings/{id} | Отменить бронь | владелец, Admin | 200 OK (тело брони) | 400, 401, 403, 404 |
 
 `POST /events/{id}/book` возвращает заголовок `Location`, указывающий на `/bookings/{bookingId}` для отслеживания статуса созданной брони.
 `POST /events/{id}/book` возвращает `409 Conflict`, если событие существует, но свободных мест больше нет. Ошибка соответствует `NoAvailableSeatsException`.
 
 ## Аутентификация и роли
 
-API использует JWT (Bearer). Токен выдаёт `POST /auth/login`, передаётся он в заголовке `Authorization: Bearer <токен>`. Токен действует один час, после этого нужно войти заново. Идентификатор и роль пользователя сервер берёт из claims токена, клиент не передаёт их в запросе.
+API использует JWT (Bearer). Токен выдаёт `POST /auth/login`, передаётся он в заголовке `Authorization: Bearer <токен>`. Токен действует 60 минут (параметр `Jwt:LifetimeMinutes`), после этого нужно войти заново. Идентификатор и роль пользователя сервер берёт из claims токена, клиент не передаёт их в запросе.
 
 ### Роли и права
 
@@ -246,7 +246,9 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 
 ### Регистрация и роль
 
-`POST /auth/register` принимает `login`, `password` и необязательное поле `role` (`User` или `Admin`). Без `role` создаётся `User`, неизвестное значение даёт `400`.
+`POST /auth/register` принимает `login`, `password` и необязательное поле `role` (`User` или `Admin`). Без `role` создаётся `User`, неизвестное значение даёт `400`, занятый логин — `409`.
+
+Успешная регистрация возвращает `204 No Content` без тела. Чтобы получить токен, выполните `POST /auth/login`.
 
 > Возможность указать `role = "Admin"` при регистрации оставлена только для тестирования. В продакшне её нужно убрать: иначе любой пользователь сам станет администратором.
 
@@ -260,7 +262,7 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 ## Получение JWT-токена через Swagger
 
 1. Запустите API и откройте `http://localhost:5102/swagger`.
-2. Выполните `POST /auth/register`, например `{"login": "user1", "password": "Passw0rd!"}`. Для администратора добавьте `"role": "Admin"`.
+2. Выполните `POST /auth/register`, например `{"login": "user1", "password": "Passw0rd!"}` (ответ `204 No Content`). Для администратора добавьте `"role": "Admin"`.
 3. Выполните `POST /auth/login` с теми же данными и скопируйте токен из ответа без кавычек.
 4. Нажмите **Authorize**, вставьте токен в поле Value (слово `Bearer` писать не нужно), нажмите Authorize и Close.
 5. Теперь запросы из Swagger уходят с заголовком `Authorization`. Чтобы сменить пользователя, нажмите Authorize → Logout и вставьте другой токен.
@@ -269,15 +271,15 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 
 ## Настройка секрета JWT
 
-Параметры токена задаются в `EventsApi.Presentation/appsettings.json`:
+Параметры токена задаются в секции `Jwt` файла `EventsApi.Presentation/appsettings.json`. Значение `Secret` в репозитории предназначено только для локальной разработки:
 
 ```json
 {
   "Jwt": {
+    "Secret": "dev-only-secret-change-me-0123456789abcdef",
     "Issuer": "EventsApi",
     "Audience": "EventsApi.Clients",
-    "Secret": "<длинная-случайная-строка>",
-    "ExpiresMinutes": 60
+    "LifetimeMinutes": 60
   }
 }
 ```
@@ -287,7 +289,7 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 - В продакшне используйте случайную строку не короче 32 символов (для HS256 нужно минимум 256 бит) и не храните её в репозитории.
 - Передавайте секрет через переменную окружения: для секции `Jwt` и ключа `Secret` это `Jwt__Secret`.
 - Для локальной разработки подойдут user-secrets: `dotnet user-secrets set "Jwt:Secret" "<значение>" --project EventsApi.Presentation`.
-- Значение из `appsettings.json` годится только для учебного запуска. При смене секрета все выданные токены перестают действовать.
+- При смене секрета все выданные токены перестают действовать.
 
 ## GET /events — параметры фильтрации и пагинации
 
@@ -374,7 +376,7 @@ API использует JWT (Bearer). Токен выдаёт `POST /auth/login
 
 ## Примеры запросов (curl)
 
-Методы создания, изменения и удаления событий и все операции с бронями требуют токена. Сначала войдите и сохраните токен в переменную (ответ `/auth/login` — токен или JSON с токеном; при JSON извлеките значение поля с токеном):
+Методы создания, изменения и удаления событий и все операции с бронями требуют токена. Сначала войдите и сохраните токен в переменную (`/auth/login` возвращает JSON `LoginResponse`, токен нужно скопировать из него):
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:5102/auth/login \
@@ -510,7 +512,7 @@ curl -i -X DELETE http://localhost:5102/bookings/BOOKING_ID \
 | 401 Unauthorized | Токен не передан, недействителен или просрочен; неверный логин или пароль |
 | 403 Forbidden | Недостаточно прав: роль `User` вызывает методы администратора или обращается к чужой брони |
 | 404 Not Found | Событие или бронь с указанным ID не найдены (GET, PUT, DELETE, POST /events/{id}/book) |
-| 409 Conflict | На событии нет свободных мест (NoAvailableSeatsException) или у пользователя уже 10 активных броней (ActiveBookingsLimitExceededException) |
+| 409 Conflict | На событии нет свободных мест (`NoAvailableSeatsException`), у пользователя уже 10 активных броней (`ActiveBookingsLimitExceededException`), логин занят (`UserAlreadyExistsException`) или конфликт параллельного изменения (`ConcurrencyConflictException`) |
 | 500 Internal Server Error | Непредвиденные ошибки сервера |
 
 ### Поля ответа об ошибке
@@ -530,7 +532,7 @@ curl -i -X DELETE http://localhost:5102/bookings/BOOKING_ID \
 
 В решении два тестовых проекта:
 
-- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) `BookingService` (создание брони, места, конкурентные запросы, несуществующее и удалённое событие), правила бронирования (`BookingRulesTests`: бронь прошедшего события, лимит активных броней, независимость лимитов пользователей), отмену брони (`BookingCancellationTests`), `JwtTokenService`, хеширование паролей и доменные модели `User` и `Booking`. Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
+- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони, места, конкурентные запросы, несуществующее и удалённое событие), правила бронирования (`BookingRulesTests`: бронь прошедшего события, лимит активных броней, независимость лимитов пользователей), отмену брони (`BookingCancellationTests`), `JwtTokenService`, хеширование паролей и доменные модели `User` и `Booking`. Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
 - `EventsApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
 
 ### Интеграционные тесты и Docker

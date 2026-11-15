@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BookingsService.Domain\BookingsService.Domain.csproj" />
+    <ProjectReference Include="..\..\Contracts\EventServiceManager.Contracts\EventServiceManager.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

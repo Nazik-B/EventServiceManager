@@ -7,6 +7,9 @@
     <Project Path="BookingsService/BookingsService.Presentation/BookingsService.Presentation.csproj" />
     <Project Path="BookingsService/BookingsService.Tests/BookingsService.Tests.csproj" />
   </Folder>
+  <Folder Name="/Contracts/">
+    <Project Path="Contracts/EventServiceManager.Contracts/EventServiceManager.Contracts.csproj" />
+  </Folder>
   <Folder Name="/EventsService/">
     <Project Path="EventsService/EventsService.Application/EventsService.Application.csproj" />
     <Project Path="EventsService/EventsService.Domain/EventsService.Domain.csproj" />

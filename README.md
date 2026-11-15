@@ -538,8 +538,18 @@ curl -i -X DELETE http://localhost:5102/bookings/BOOKING_ID \
 
 В решении два тестовых проекта:
 
-- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони, места, конкурентные запросы, несуществующее и удалённое событие), правила бронирования (`BookingRulesTests`: бронь прошедшего события, лимит активных броней, независимость лимитов пользователей), отмену брони (`BookingCancellationTests`), `JwtTokenService`, хеширование паролей и доменные модели `User` и `Booking`. Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса.
-- `EventsApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers.
+- `EventsApi.UnitTests` — unit-тесты сервисов на xUnit: `EventService` (успешные и неуспешные сценарии CRUD, фильтрации, пагинации и валидации) и `BookingService` (создание брони, места, конкурентные запросы, несуществующее и удалённое событие), правила бронирования (`BookingRulesTests`: бронь прошедшего события, лимит активных броней, независимость лимитов пользователей), отмену брони (`BookingCancellationTests`), `JwtTokenService`, хеширование паролей и доменные модели `User` и `Booking`.`AuthServiceTests` (регистрация: роль по умолчанию, неизвестная роль, дубликат логина, хранение хеша; вход: токен, неверный пароль и неизвестный логин дают одну и ту же ошибку). Используют провайдер `Microsoft.EntityFrameworkCore.InMemory`, не требуют PostgreSQL и Docker. Каждый тестовый класс создаёт отдельный `ServiceProvider` и уникальную InMemory-базу через `Guid.NewGuid().ToString()`. В тестах конкурентности каждый параллельный запрос создаёт отдельный DI scope и получает собственный `AppDbContext`, но использует общую InMemory-базу тестового класса. 
+- `EventsApi.IntegrationTests` — интеграционные тесты репозиториев на реальной базе PostgreSQL через Testcontainers. 
+Кроме тестов репозиториев, `EventsApi.IntegrationTests` содержит HTTP-тесты авторизации (`AuthorizationHttpTests`). Они поднимают приложение через `WebApplicationFactory<Program>` (`ApiFactory`) с PostgreSQL в Testcontainers и проверяют настройку JWT из `Program.cs`:
+
+- защищённый маршрут без токена возвращает 401, так же как мусорный токен и токен с изменённой подписью;
+- токен роли `User` на `POST /events` возвращает 403, токен `Admin` возвращает 201;
+- чужую бронь пользователь получить не может (403), а владелец и администратор могут (200);
+- повторная регистрация логина возвращает 409, неверный пароль при входе возвращает 401.
+
+Тестовые проекты ссылаются на Application, Domain и Infrastructure. Исключение: `EventsApi.IntegrationTests` дополнительно ссылается на Presentation, чтобы HTTP-тесты могли запускать приложение через `WebApplicationFactory`.
+
+Для этих тестов нужен запущенный Docker.
 
 ### Интеграционные тесты и Docker
 

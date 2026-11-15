@@ -3,6 +3,7 @@
     <Project Path="BookingsService/BookingsService.Application/BookingsService.Application.csproj" />
     <Project Path="BookingsService/BookingsService.Domain/BookingsService.Domain.csproj" />
     <Project Path="BookingsService/BookingsService.Infrastructure/BookingsService.Infrastructure.csproj" />
+    <Project Path="BookingsService/BookingsService.IntegrationTests/BookingsService.IntegrationTests.csproj" />
     <Project Path="BookingsService/BookingsService.Presentation/BookingsService.Presentation.csproj" />
     <Project Path="BookingsService/BookingsService.Tests/BookingsService.Tests.csproj" />
   </Folder>
@@ -10,6 +11,7 @@
     <Project Path="EventsService/EventsService.Application/EventsService.Application.csproj" />
     <Project Path="EventsService/EventsService.Domain/EventsService.Domain.csproj" />
     <Project Path="EventsService/EventsService.Infrastructure/EventsService.Infrastructure.csproj" />
+    <Project Path="EventsService/EventsService.IntegrationTests/EventsService.IntegrationTests.csproj" />
     <Project Path="EventsService/EventsService.Presentation/EventsService.Presentation.csproj" />
     <Project Path="EventsService/EventsService.Tests/EventsService.Tests.csproj" />
   </Folder>
@@ -20,6 +22,7 @@
     <Project Path="UsersService/UsersService.Application/UsersService.Application.csproj" />
     <Project Path="UsersService/UsersService.Domain/UsersService.Domain.csproj" />
     <Project Path="UsersService/UsersService.Infrastructure/UsersService.Infrastructure.csproj" />
+    <Project Path="UsersService/UsersService.IntegrationTests/UsersService.IntegrationTests.csproj" />
     <Project Path="UsersService/UsersService.Presentation/UsersService.Presentation.csproj" />
     <Project Path="UsersService/UsersService.Tests/UsersService.Tests.csproj" />
   </Folder>

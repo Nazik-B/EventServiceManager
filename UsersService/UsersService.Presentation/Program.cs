@@ -1,17 +1,43 @@
+using UsersService.Application;
+using UsersService.Application.Abstractions;
+using UsersService.Infrastructure;
+using UsersService.Infrastructure.Security;
+using UsersService.Presentation.Middleware;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 
-builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
+builder.Services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
+
+builder.Services
+    .AddOptions<JwtOptions>()
+    .BindConfiguration(JwtOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddApplication();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.Services.ApplyMigrations();
 
-app.UseHttpsRedirection();
+app.UseGlobalExceptionHandling();
 
-app.UseAuthorization();
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

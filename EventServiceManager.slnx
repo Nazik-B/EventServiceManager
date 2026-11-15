@@ -11,6 +11,7 @@
     <Project Path="EventsService/EventsService.Domain/EventsService.Domain.csproj" />
     <Project Path="EventsService/EventsService.Infrastructure/EventsService.Infrastructure.csproj" />
     <Project Path="EventsService/EventsService.Presentation/EventsService.Presentation.csproj" />
+    <Project Path="EventsService/EventsService.Tests/EventsService.Tests.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="Shared/EventsApi.Contracts/EventsApi.Contracts.csproj" />

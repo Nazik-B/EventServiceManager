@@ -1,4 +1,25 @@
 <Solution>
+  <Folder Name="/BookingsService/">
+    <Project Path="BookingsService/BookingsService.Application/BookingsService.Application.csproj" />
+    <Project Path="BookingsService/BookingsService.Domain/BookingsService.Domain.csproj" />
+    <Project Path="BookingsService/BookingsService.Infrastructure/BookingsService.Infrastructure.csproj" />
+    <Project Path="BookingsService/BookingsService.Presentation/BookingsService.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/EventsService/">
+    <Project Path="EventsService/EventsService.Application/EventsService.Application.csproj" />
+    <Project Path="EventsService/EventsService.Domain/EventsService.Domain.csproj" />
+    <Project Path="EventsService/EventsService.Infrastructure/EventsService.Infrastructure.csproj" />
+    <Project Path="EventsService/EventsService.Presentation/EventsService.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/EventsApi.Contracts/EventsApi.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/UsersService/">
+    <Project Path="UsersService/UsersService.Application/UsersService.Application.csproj" />
+    <Project Path="UsersService/UsersService.Domain/UsersService.Domain.csproj" />
+    <Project Path="UsersService/UsersService.Infrastructure/UsersService.Infrastructure.csproj" />
+    <Project Path="UsersService/UsersService.Presentation/UsersService.Presentation.csproj" />
+  </Folder>
   <Project Path="EventsApi.Application/EventsApi.Application.csproj" />
   <Project Path="EventsApi.Domain/EventsApi.Domain.csproj" />
   <Project Path="EventsApi.Infrastructure/EventsApi.Infrastructure.csproj" />

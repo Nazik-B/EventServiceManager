@@ -4,6 +4,7 @@
     <Project Path="BookingsService/BookingsService.Domain/BookingsService.Domain.csproj" />
     <Project Path="BookingsService/BookingsService.Infrastructure/BookingsService.Infrastructure.csproj" />
     <Project Path="BookingsService/BookingsService.Presentation/BookingsService.Presentation.csproj" />
+    <Project Path="BookingsService/BookingsService.Tests/BookingsService.Tests.csproj" />
   </Folder>
   <Folder Name="/EventsService/">
     <Project Path="EventsService/EventsService.Application/EventsService.Application.csproj" />
@@ -19,6 +20,7 @@
     <Project Path="UsersService/UsersService.Domain/UsersService.Domain.csproj" />
     <Project Path="UsersService/UsersService.Infrastructure/UsersService.Infrastructure.csproj" />
     <Project Path="UsersService/UsersService.Presentation/UsersService.Presentation.csproj" />
+    <Project Path="UsersService/UsersService.Tests/UsersService.Tests.csproj" />
   </Folder>
   <Project Path="EventsApi.Application/EventsApi.Application.csproj" />
   <Project Path="EventsApi.Domain/EventsApi.Domain.csproj" />

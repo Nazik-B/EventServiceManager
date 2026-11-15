@@ -1,8 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using BookingsService.Application.Abstractions;
 using BookingsService.Application.Repositories;
 using BookingsService.Infrastructure.BackgroundServices;
 using BookingsService.Infrastructure.DataAccess;
+using BookingsService.Infrastructure.Messaging;
 using BookingsService.Infrastructure.Repositories;
 
 namespace BookingsService.Infrastructure;
@@ -13,6 +15,7 @@ public static class DependencyInjection
     {
         services.AddDbContext<BookingsDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
         services.AddHostedService<BookingProcessingBackgroundService>();
         return services;
     }

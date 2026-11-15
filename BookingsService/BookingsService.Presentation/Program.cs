@@ -1,5 +1,6 @@
 ﻿using BookingsService.Application;
 using BookingsService.Infrastructure;
+using BookingsService.Infrastructure.Messaging;
 using BookingsService.Infrastructure.Security;
 using BookingsService.Presentation.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -38,6 +39,12 @@ builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("De
 builder.Services
     .AddOptions<JwtOptions>()
     .BindConfiguration(JwtOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<KafkaOptions>()
+    .BindConfiguration(KafkaOptions.SectionName)
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -85,3 +92,4 @@ app.MapControllers();
 app.Run();
 
 public partial class Program { }
+

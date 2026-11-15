@@ -1,15 +1,23 @@
-﻿using BookingsService.Application.Repositories;
+﻿using BookingsService.Application.Abstractions;
+using BookingsService.Application.Repositories;
 using BookingsService.Domain.Entities;
+using EventServiceManager.Contracts;
 
 namespace BookingsService.Application.Services;
 
 public class BookingProcessingService : IBookingProcessingService
 {
-    private readonly IBookingRepository _bookingRepository;
+    private const int SeatsPerBooking = 1;
 
-    public BookingProcessingService(IBookingRepository bookingRepository)
+    private readonly IBookingRepository _bookingRepository;
+    private readonly IBookingEventPublisher _eventPublisher;
+
+    public BookingProcessingService(
+        IBookingRepository bookingRepository,
+        IBookingEventPublisher eventPublisher)
     {
         _bookingRepository = bookingRepository;
+        _eventPublisher = eventPublisher;
     }
 
     public async Task<IReadOnlyList<Guid>> GetPendingBookingIdsAsync(CancellationToken cancellationToken = default)
@@ -26,10 +34,23 @@ public class BookingProcessingService : IBookingProcessingService
             return BookingProcessingResult.Skipped;
         }
 
-        booking.Status = BookingStatus.Confirmed;
-        booking.ProcessedAt = DateTime.UtcNow;
+        var confirmedAt = DateTime.UtcNow;
 
+        booking.Status = BookingStatus.Confirmed;
+        booking.ProcessedAt = confirmedAt;
+
+        // 1. Сначала сохраняем статус в своей базе.
         await _bookingRepository.SaveChangesAsync(cancellationToken);
+
+        // 2. Только потом публикуем событие.
+        await _eventPublisher.PublishBookingConfirmedAsync(
+            new BookingConfirmed(
+                booking.Id,
+                booking.EventId,
+                booking.UserId,
+                SeatsPerBooking,
+                confirmedAt),
+            cancellationToken);
 
         return BookingProcessingResult.Confirmed;
     }

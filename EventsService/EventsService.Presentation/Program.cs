@@ -1,5 +1,6 @@
 ﻿using EventsService.Application;
 using EventsService.Infrastructure;
+using EventsService.Infrastructure.Messaging;
 using EventsService.Infrastructure.Security;
 using EventsService.Presentation.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,7 +42,15 @@ builder.Services
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<KafkaOptions>()
+    .BindConfiguration(KafkaOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddApplication();
+builder.Services.AddBookingEventHandling();
+builder.Services.AddKafkaMessaging();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -85,3 +94,4 @@ app.MapControllers();
 app.Run();
 
 public partial class Program { }
+

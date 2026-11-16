@@ -108,7 +108,7 @@ services:
         condition: service_healthy
     environment:
       <<: *jwt
-      ConnectionStrings__DefaultConnection: Host=users-db;Port=5432;Database=users;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=users-db;Port=5432;Database=users;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
     ports:
       - "5003:8080"
 
@@ -125,7 +125,7 @@ services:
         condition: service_healthy
     environment:
       <<: *jwt
-      ConnectionStrings__DefaultConnection: Host=events-db;Port=5432;Database=events;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=events-db;Port=5432;Database=events;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerGroup: events-service
     ports:
@@ -144,7 +144,7 @@ services:
         condition: service_healthy
     environment:
       <<: *jwt
-      ConnectionStrings__DefaultConnection: Host=bookings-db;Port=5432;Database=bookings;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=bookings-db;Port=5432;Database=bookings;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
     ports:
       - "5002:8080"
@@ -153,4 +153,5 @@ volumes:
   events-db-data:
   users-db-data:
   bookings-db-data:
+
 

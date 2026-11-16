@@ -1,3 +1,5 @@
+﻿using Microsoft.EntityFrameworkCore;
+using UsersService.Infrastructure.DataAccess;
 using UsersService.Application;
 using UsersService.Application.Abstractions;
 using UsersService.Infrastructure;
@@ -37,6 +39,12 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    await db.Database.MigrateAsync();
+}
 
 app.Run();
 

@@ -1,4 +1,6 @@
-﻿using EventsService.Application;
+﻿using Microsoft.EntityFrameworkCore;
+using EventsService.Infrastructure.DataAccess;
+using EventsService.Application;
 using EventsService.Infrastructure;
 using EventsService.Infrastructure.Messaging;
 using EventsService.Infrastructure.Security;
@@ -91,7 +93,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<EventsDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.Run();
 
 public partial class Program { }
+
 

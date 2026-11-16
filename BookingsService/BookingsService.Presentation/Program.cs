@@ -1,4 +1,6 @@
-﻿using BookingsService.Application;
+﻿using Microsoft.EntityFrameworkCore;
+using BookingsService.Infrastructure.DataAccess;
+using BookingsService.Application;
 using BookingsService.Infrastructure;
 using BookingsService.Infrastructure.Messaging;
 using BookingsService.Infrastructure.Security;
@@ -89,7 +91,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<BookingsDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.Run();
 
 public partial class Program { }
+
 

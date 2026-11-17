@@ -231,30 +231,68 @@ dotnet ef database update \
 
 ## Сквозной сценарий (PowerShell)
 
-Пример проверки всей цепочки: Users → Events → Bookings → Kafka → Events.
+Скрипт проверяет всю цепочку: Users → Events → Bookings → Kafka → Events. Работает в Windows PowerShell 5.1 и PowerShell 7, система должна быть запущена (`docker compose up -d --build`).
 
 ```powershell
 $u = "http://localhost:5003"; $e = "http://localhost:5001"; $b = "http://localhost:5002"
-$s = Get-Random -Maximum 99999
-$pass = "Passw0rd!$s"
+$json = "application/json"; $rnd = Get-Random; $pass = "Passw0rd!"
+$userLogin = "user$rnd"; $adminLogin = "admin$rnd"
 
-function Post($url, $body, $token) {
-  $h = @{}; if ($token) { $h.Authorization = "Bearer $token" }
-  Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Headers $h -Body ($body | ConvertTo-Json)
+function Reg($login, $role) {
+  $body = @{ login = $login; password = $pass }
+  if ($role) { $body.role = $role }
+  Invoke-RestMethod "$u/auth/register" -Method Post -ContentType $json -Body ($body | ConvertTo-Json) | Out-Null
+}
+function Login($login) {
+  (Invoke-RestMethod "$u/auth/login" -Method Post -ContentType $json -Body (@{ login = $login; password = $pass } | ConvertTo-Json)).token
 }
 
-Post "$u/auth/register" @{ login = "admin$s"; password = $pass; role = "Admin" } $null | Out-Null
-Post "$u/auth/register" @{ login = "user$s";  password = $pass; role = "User"  } $null | Out-Null
-$adminToken = (Post "$u/auth/login" @{ login = "admin$s"; password = $pass } $null).token
-$userToken  = (Post "$u/auth/login" @{ login = "user$s";  password = $pass } $null).token
+# 1. Users: регистрация и токены
+Reg $userLogin $null
+Reg $adminLogin "Admin"
+$userToken = Login $userLogin
+$adminToken = Login $adminLogin
+if (-not $userToken -or -not $adminToken) { throw "Токен не получен" }
+"1. Токены получены"
 
+# 2. Events: администратор создаёт событие на 5 мест
 $start = (Get-Date).ToUniversalTime().AddDays(30)
-$ev = Post "$e/events" @{ title = "Kafka e2e"; startAt = $start.ToString("o"); endAt = $start.AddHours(2).ToString("o"); totalSeats = 5 } $adminToken
-$bk = Post "$b/events/$($ev.id)/book" @{} $userToken      # 202, status: Pending
+$ev = Invoke-RestMethod "$e/events" -Method Post -ContentType $json -Headers @{ Authorization = "Bearer $adminToken" } `
+  -Body (@{ title = "Kafka e2e $rnd"; startAt = $start.ToString("o"); endAt = $start.AddHours(2).ToString("o"); totalSeats = 5 } | ConvertTo-Json)
+$before = (Invoke-RestMethod "$e/events/$($ev.id)").availableSeats
+"2. Событие $($ev.id), мест до брони: $before"
 
-Start-Sleep -Seconds 8
-(Invoke-RestMethod "$e/events/$($ev.id)").availableSeats   # 4: место списано через Kafka
+# 3. Bookings: бронь (Pending) и ожидание Confirmed
+$bk = Invoke-RestMethod "$b/events/$($ev.id)/book" -Method Post -Headers @{ Authorization = "Bearer $userToken" }
+$status = $bk.status
+for ($i = 0; $i -lt 20 -and $status -ne "Confirmed"; $i++) {
+  Start-Sleep 1
+  $status = (Invoke-RestMethod "$b/bookings/$($bk.id)" -Headers @{ Authorization = "Bearer $userToken" }).status
+}
+"3. Статус брони: $status"
+
+# 4. Events: места уменьшились (сообщение прошло через Kafka)
+$after = $before
+for ($i = 0; $i -lt 15 -and $after -ge $before; $i++) {
+  Start-Sleep 1
+  $after = (Invoke-RestMethod "$e/events/$($ev.id)").availableSeats
+}
+"4. Мест после брони: $after (ожидалось $($before - 1))"
 ```
+
+Ожидаемый вывод: статус `Confirmed` и число мест на единицу меньше исходного.
+
+### Как убедиться, что места списала именно Kafka
+
+Events и Bookings не вызывают друг друга по HTTP: в коде сервисов нет `HttpClient`, а в конфигурации нет адресов соседних сервисов. Единственный путь изменения мест — подписчик `BookingConfirmedConsumer`. Это видно в логах:
+
+```powershell
+docker compose logs events-service | Select-String "Reserved"
+```
+
+Ожидаемая строка: `Reserved 1 seat(s) of event <eventId> for booking <bookingId>.`
+
+Проверка устойчивости: остановите Events (`docker compose stop events-service`), создайте и подтвердите ещё одну бронь, затем запустите сервис (`docker compose start events-service`). Подписчик прочитает сохранённое сообщение, и места уменьшатся уже после старта.
 
 ## Формат ошибок
 

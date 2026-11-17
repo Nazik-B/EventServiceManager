@@ -18,9 +18,6 @@
     <Project Path="EventsService/EventsService.Presentation/EventsService.Presentation.csproj" />
     <Project Path="EventsService/EventsService.Tests/EventsService.Tests.csproj" />
   </Folder>
-  <Folder Name="/Shared/">
-    <Project Path="Shared/EventsApi.Contracts/EventsApi.Contracts.csproj" />
-  </Folder>
   <Folder Name="/UsersService/">
     <Project Path="UsersService/UsersService.Application/UsersService.Application.csproj" />
     <Project Path="UsersService/UsersService.Domain/UsersService.Domain.csproj" />
@@ -29,10 +26,4 @@
     <Project Path="UsersService/UsersService.Presentation/UsersService.Presentation.csproj" />
     <Project Path="UsersService/UsersService.Tests/UsersService.Tests.csproj" />
   </Folder>
-  <Project Path="EventsApi.Application/EventsApi.Application.csproj" />
-  <Project Path="EventsApi.Domain/EventsApi.Domain.csproj" />
-  <Project Path="EventsApi.Infrastructure/EventsApi.Infrastructure.csproj" />
-  <Project Path="EventsApi.IntegrationTests/EventsApi.IntegrationTests.csproj" />
-  <Project Path="EventsApi.UnitTests/EventsApi.UnitTests.csproj" />
-  <Project Path="EventsApi.Presentation/EventsApi.Presentation.csproj" />
 </Solution>

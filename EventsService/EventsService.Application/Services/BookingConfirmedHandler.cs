@@ -6,10 +6,14 @@ namespace EventsService.Application.Services;
 public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
 {
     private readonly IEventRepository _eventRepository;
+    private readonly IProcessedBookingRepository _processedBookings;
 
-    public BookingConfirmedHandler(IEventRepository eventRepository)
+    public BookingConfirmedHandler(
+        IEventRepository eventRepository,
+        IProcessedBookingRepository processedBookings)
     {
         _eventRepository = eventRepository;
+        _processedBookings = processedBookings;
     }
 
     public async Task<BookingConfirmedResult> HandleAsync(
@@ -21,8 +25,12 @@ public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
             return BookingConfirmedResult.InvalidMessage;
         }
 
-        var eventItem = await _eventRepository.GetByIdTrackedAsync(message.EventId, cancellationToken);
+        if (await _processedBookings.ExistsAsync(message.BookingId, cancellationToken))
+        {
+            return BookingConfirmedResult.Duplicate;
+        }
 
+        var eventItem = await _eventRepository.GetByIdTrackedAsync(message.EventId, cancellationToken);
         if (eventItem is null)
         {
             return BookingConfirmedResult.EventNotFound;
@@ -33,9 +41,17 @@ public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
             return BookingConfirmedResult.NoAvailableSeats;
         }
 
-        await _eventRepository.SaveChangesAsync();
+        _processedBookings.Add(message.BookingId);
+
+        try
+        {
+            await _eventRepository.SaveChangesAsync();
+        }
+        catch (DuplicateBookingException)
+        {
+            return BookingConfirmedResult.Duplicate;
+        }
 
         return BookingConfirmedResult.SeatsReserved;
     }
 }
-

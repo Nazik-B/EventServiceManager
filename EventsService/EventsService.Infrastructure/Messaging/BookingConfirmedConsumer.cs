@@ -190,6 +190,11 @@ public sealed class BookingConfirmedConsumer : BackgroundService
                     "Invalid seats count {Seats} in booking {BookingId}; message skipped.",
                     message.SeatsCount, message.BookingId);
                 break;
+            case BookingConfirmedResult.Duplicate:
+                _logger.LogWarning(
+                    "Duplicate BookingConfirmed for booking {BookingId}; already processed, skipped.",
+                    message.BookingId);
+                break;
         }
     }
 }

@@ -2,6 +2,8 @@
 using EventsService.Domain.Entities;
 using EventsService.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
+using EventsService.Application;
+using Npgsql;
 
 namespace EventsService.Infrastructure.Repositories;
 
@@ -77,8 +79,15 @@ public sealed class EventRepository : IEventRepository
         _dbContext.Events.Remove(eventItem);
     }
 
-    public Task<int> SaveChangesAsync()
+    public async Task<int> SaveChangesAsync()
     {
-        return _dbContext.SaveChangesAsync();
+        try
+        {
+            return await _dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            throw new DuplicateBookingException();
+        }
     }
 }

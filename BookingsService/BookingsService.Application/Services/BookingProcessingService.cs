@@ -1,4 +1,4 @@
-﻿using BookingsService.Application.Abstractions;
+﻿using System.Text.Json;
 using BookingsService.Application.Repositories;
 using BookingsService.Domain.Entities;
 using EventServiceManager.Contracts;
@@ -10,14 +10,14 @@ public class BookingProcessingService : IBookingProcessingService
     private const int SeatsPerBooking = 1;
 
     private readonly IBookingRepository _bookingRepository;
-    private readonly IBookingEventPublisher _eventPublisher;
+    private readonly IOutboxRepository _outboxRepository;
 
     public BookingProcessingService(
         IBookingRepository bookingRepository,
-        IBookingEventPublisher eventPublisher)
+        IOutboxRepository outboxRepository)
     {
         _bookingRepository = bookingRepository;
-        _eventPublisher = eventPublisher;
+        _outboxRepository = outboxRepository;
     }
 
     public async Task<IReadOnlyList<Guid>> GetPendingBookingIdsAsync(CancellationToken cancellationToken = default)
@@ -39,18 +39,25 @@ public class BookingProcessingService : IBookingProcessingService
         booking.Status = BookingStatus.Confirmed;
         booking.ProcessedAt = confirmedAt;
 
-        // 1. Сначала сохраняем статус в своей базе.
-        await _bookingRepository.SaveChangesAsync(cancellationToken);
+        // Статус брони и сообщение outbox сохраняются одной транзакцией.
+        // В Kafka сообщение отправляет OutboxPublisherBackgroundService.
+        var message = new BookingConfirmed(
+            booking.Id,
+            booking.EventId,
+            booking.UserId,
+            SeatsPerBooking,
+            confirmedAt);
 
-        // 2. Только потом публикуем событие.
-        await _eventPublisher.PublishBookingConfirmedAsync(
-            new BookingConfirmed(
-                booking.Id,
-                booking.EventId,
-                booking.UserId,
-                SeatsPerBooking,
+        await _outboxRepository.AddAsync(
+            OutboxMessage.Create(
+                nameof(BookingConfirmed),
+                KafkaTopics.BookingConfirmed,
+                booking.EventId.ToString(),
+                JsonSerializer.Serialize(message),
                 confirmedAt),
             cancellationToken);
+
+        await _bookingRepository.SaveChangesAsync(cancellationToken);
 
         return BookingProcessingResult.Confirmed;
     }

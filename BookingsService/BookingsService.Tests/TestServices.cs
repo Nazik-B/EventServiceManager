@@ -1,4 +1,4 @@
-﻿using BookingsService.Application;
+using BookingsService.Application;
 using BookingsService.Application.Abstractions;
 using BookingsService.Application.Repositories;
 using BookingsService.Infrastructure.DataAccess;
@@ -16,6 +16,7 @@ internal static class TestServices
         var services = new ServiceCollection();
         services.AddDbContext<BookingsDbContext>(o => o.UseInMemoryDatabase(dbName));
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddSingleton<IBookingEventPublisher>(publisher ?? new FakeBookingEventPublisher());
         services.AddApplication();
         return services.BuildServiceProvider();

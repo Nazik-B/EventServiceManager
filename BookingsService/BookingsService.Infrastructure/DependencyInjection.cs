@@ -15,8 +15,10 @@ public static class DependencyInjection
     {
         services.AddDbContext<BookingsDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
         services.AddHostedService<BookingProcessingBackgroundService>();
+        services.AddHostedService<OutboxPublisherBackgroundService>();
         return services;
     }
 

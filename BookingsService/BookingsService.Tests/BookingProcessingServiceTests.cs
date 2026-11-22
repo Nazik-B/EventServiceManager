@@ -1,6 +1,10 @@
-﻿using BookingsService.Application.Services;
+using System.Text.Json;
+using BookingsService.Application.Services;
 using BookingsService.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
+using BookingsService.Infrastructure.DataAccess;
+using EventServiceManager.Contracts;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace BookingsService.Tests;
@@ -20,6 +24,9 @@ public class BookingProcessingServiceTests
 
     private static IBookingProcessingService Processing(IServiceScope s) =>
         s.ServiceProvider.GetRequiredService<IBookingProcessingService>();
+
+    private static Task<List<OutboxMessage>> Outbox(IServiceScope s) =>
+        s.ServiceProvider.GetRequiredService<BookingsDbContext>().OutboxMessages.AsNoTracking().ToListAsync();
 
     [Fact]
     public async Task GetPendingBookingIdsAsync_ReturnsOnlyPending()
@@ -51,7 +58,7 @@ public class BookingProcessingServiceTests
     }
 
     [Fact]
-    public async Task ProcessBookingAsync_PublishesBookingConfirmed_WithBookingData()
+    public async Task ProcessBookingAsync_StoresBookingConfirmedInOutbox_WithBookingData()
     {
         using var scope = _sp.CreateScope();
         var eventId = Guid.NewGuid();
@@ -60,26 +67,34 @@ public class BookingProcessingServiceTests
 
         await Processing(scope).ProcessBookingAsync(booking.Id);
 
-        var message = Assert.Single(_publisher.Published);
+        var row = Assert.Single(await Outbox(scope));
+        Assert.Equal(nameof(BookingConfirmed), row.Type);
+        Assert.Equal(KafkaTopics.BookingConfirmed, row.Topic);
+        Assert.Equal(eventId.ToString(), row.Key);
+        Assert.Null(row.ProcessedAt);
+        var message = JsonSerializer.Deserialize<BookingConfirmed>(row.Payload)!;
         Assert.Equal(booking.Id, message.BookingId);
         Assert.Equal(eventId, message.EventId);
         Assert.Equal(userId, message.UserId);
         Assert.Equal(1, message.SeatsCount);
         Assert.True(message.ConfirmedAt <= DateTime.UtcNow);
+        Assert.Empty(_publisher.Published);
     }
 
     [Fact]
-    public async Task ProcessBookingAsync_KeepsBookingConfirmed_WhenPublishFails()
+    public async Task ProcessBookingAsync_ConfirmsBooking_AndStoresOutbox_EvenIfBrokerIsDown()
     {
         using var scope = _sp.CreateScope();
         var booking = await Bookings(scope).CreateBookingAsync(Guid.NewGuid(), Guid.NewGuid());
         _publisher.ExceptionToThrow = new InvalidOperationException("broker is down");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => Processing(scope).ProcessBookingAsync(booking.Id));
+        var result = await Processing(scope).ProcessBookingAsync(booking.Id);
 
         var after = await Bookings(scope).GetBookingByIdAsync(booking.Id, Guid.NewGuid(), isAdmin: true);
+        Assert.Equal(BookingProcessingResult.Confirmed, result);
         Assert.Equal(BookingStatus.Confirmed, after!.Status);
+        var row = Assert.Single(await Outbox(scope));
+        Assert.Null(row.ProcessedAt);
     }
 
     [Fact]
@@ -95,7 +110,7 @@ public class BookingProcessingServiceTests
         var after = await Bookings(scope).GetBookingByIdAsync(booking.Id, Guid.NewGuid(), isAdmin: true);
         Assert.Equal(BookingProcessingResult.Skipped, result);
         Assert.Equal(BookingStatus.Cancelled, after!.Status);
-        Assert.Empty(_publisher.Published);
+        Assert.Empty(await Outbox(scope));
     }
 
     [Fact]
@@ -106,7 +121,7 @@ public class BookingProcessingServiceTests
         var result = await Processing(scope).ProcessBookingAsync(Guid.NewGuid());
 
         Assert.Equal(BookingProcessingResult.Skipped, result);
-        Assert.Empty(_publisher.Published);
+        Assert.Empty(await Outbox(scope));
     }
 
     [Fact]
@@ -121,7 +136,7 @@ public class BookingProcessingServiceTests
         Assert.True(rejected);
         Assert.Equal(BookingStatus.Rejected, after!.Status);
         Assert.NotNull(after.ProcessedAt);
-        Assert.Empty(_publisher.Published);
+        Assert.Empty(await Outbox(scope));
     }
 
     [Fact]

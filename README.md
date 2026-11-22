@@ -25,7 +25,7 @@
 |---|---|---|---|
 | `UsersService` | 5003 | Регистрация, вход, выдача JWT-токена. Только он выпускает токены. | `users-db` |
 | `EventsService` | 5001 | CRUD событий, фильтры, пагинация. Списывает места по сообщениям из Kafka. | `events-db` |
-| `BookingsService` | 5002 | Создание, просмотр и отмена броней, фоновое подтверждение, публикация `BookingConfirmed`. | `bookings-db` |
+| `BookingsService` | 5002 | Создание, просмотр и отмена броней, фоновое подтверждение, публикация `BookingConfirmed` через transactional outbox. | `bookings-db` |
 
 У каждого сервиса своя база данных и свои миграции EF Core. Events и Bookings только проверяют токен, выданный Users: во всех трёх сервисах одинаковые `Jwt:Secret`, `Jwt:Issuer` и `Jwt:Audience`.
 
@@ -48,7 +48,7 @@ EventServiceManager/
 Связь между Bookings и Events построена на одном событии.
 
 1. Bookings принимает бронь (`Pending`) и фоновый сервис её подтверждает (`Confirmed`).
-2. После подтверждения Bookings публикует сообщение `BookingConfirmed` (содержит `BookingId`, `EventId`, `SeatsCount` и служебные поля) в топик `booking-confirmed`.
+2. При подтверждении Bookings в одной транзакции сохраняет статус брони и сообщение `BookingConfirmed` (содержит `BookingId`, `EventId`, `SeatsCount` и служебные поля) в таблицу `OutboxMessages`. Отдельный фоновый сервис `OutboxPublisherBackgroundService` публикует записи в топик `booking-confirmed`.
 3. Events читает топик (consumer group `events-service`) и уменьшает `AvailableSeats` у события.
 
 Параметры:
@@ -59,6 +59,7 @@ EventServiceManager/
 | Формат | JSON (`BookingConfirmed` из `EventServiceManager.Contracts`) |
 | Создание топика | `KafkaTopicInitializer` в Events при старте (3 раздела, репликация 1). Если топик существует, шаг пропускается; ошибка создания только логируется и запуск не останавливает. |
 | Подписчик | `BookingConfirmedConsumer` (`BackgroundService`, слой Infrastructure сервиса Events). Для каждого сообщения создаётся отдельный DI scope. |
+| Transactional outbox (Bookings) | Сообщение `BookingConfirmed` пишется в `OutboxMessages` в одной транзакции со статусом брони. `OutboxPublisherBackgroundService` выбирает неотправленные записи (`ProcessedAt IS NULL`), публикует их в Kafka и проставляет `ProcessedAt`. При ошибке (например, Kafka недоступна) растёт `Attempts`, пишется `LastError`, и запись повторяется позже: бронь остаётся `Confirmed`, сообщение не теряется. Публикация тоже «минимум один раз»: если сервис упадёт между отправкой и отметкой `ProcessedAt`, сообщение уйдёт повторно, а дубликат отсечёт идемпотентность в Events. |
 | Гарантия доставки | «Минимум один раз»: оффсет подтверждается вручную после обработки. |
 | Идемпотентность | Events записывает `BookingId` в таблицу `ProcessedBookings` (первичный ключ) в той же транзакции, что и списание мест. Повторное сообщение с тем же `BookingId` пропускается с `Warning` в логе, места не списываются повторно. Одновременная доставка дубликатов тоже безопасна: вторая вставка нарушает уникальность ключа и обрабатывается как дубликат. |
 | Ошибки обработки | До 3 попыток с паузой 1 секунда, затем сообщение пропускается с `Error` в логе. |
@@ -68,6 +69,7 @@ EventServiceManager/
 
 - Bookings принимает `EventId` без проверки: он не знает, существует ли событие, не началось ли оно и есть ли места. Если события нет или мест не осталось, бронь всё равно станет `Confirmed`, а Events пропустит сообщение и запишет предупреждение в лог.
 - Отмена подтверждённой брони не возвращает место в Events: отдельного события `BookingCancelled` нет.
+- Очистка обработанных записей `OutboxMessages` и обработка «мёртвых» сообщений (ограничение числа попыток) не реализованы: таблица растёт, а недоставляемое сообщение повторяется бесконечно.
 - Удаление события в Events не удаляет брони в Bookings: у сервисов разные базы.
 
 ## Стек технологий
@@ -135,7 +137,7 @@ dotnet ef database update \
   --startup-project EventsService/EventsService.Presentation/EventsService.Presentation.csproj
 ```
 
-Таблицы: `events` и `ProcessedBookings` (Events), `bookings` (Bookings), `users` (Users). `ProcessedBookings` хранит идентификаторы уже обработанных броней (`BookingId` — первичный ключ, `ProcessedAt` — время обработки). В Bookings нет внешнего ключа на события, потому что события живут в другой базе. В `users` уникальный индекс по `Login`, пароль хранится только в виде хеша.
+Таблицы: `events` и `ProcessedBookings` (Events), `bookings` и `OutboxMessages` (Bookings), `users` (Users). `ProcessedBookings` хранит идентификаторы уже обработанных броней (`BookingId` — первичный ключ, `ProcessedAt` — время обработки). `OutboxMessages` хранит сообщения Bookings для отправки в Kafka (`Type`, `Topic`, `Key`, `Payload`, `OccurredAt`, `ProcessedAt`, `Attempts`, `LastError`); частичный индекс по `OccurredAt` ускоряет выборку записей с `ProcessedAt IS NULL`. В Bookings нет внешнего ключа на события, потому что события живут в другой базе. В `users` уникальный индекс по `Login`, пароль хранится только в виде хеша.
 
 ## Аутентификация и роли
 
@@ -216,7 +218,7 @@ dotnet ef database update \
 | `createdAt` | `DateTime` | Время создания (UTC). |
 | `processedAt` | `DateTime?` | Время обработки фоновым сервисом; `null`, пока бронь `Pending`. |
 
-Статусы: `Pending` — создана и ждёт обработки; `Confirmed` — подтверждена, сообщение отправлено в Kafka; `Rejected` — отклонена при обработке; `Cancelled` — отменена владельцем или администратором.
+Статусы: `Pending` — создана и ждёт обработки; `Confirmed` — подтверждена, сообщение записано в outbox и будет отправлено в Kafka; `Rejected` — отклонена при обработке; `Cancelled` — отменена владельцем или администратором.
 
 ## Правила бронирования
 
@@ -227,7 +229,7 @@ dotnet ef database update \
 
 ### Фоновая обработка
 
-`POST /events/{id}/book` не обрабатывает бронь синхронно: создаётся `Booking` в статусе `Pending` и сразу возвращается `202`. `BookingProcessingBackgroundService` каждые 5 секунд находит брони `Pending`, обрабатывает каждую в отдельном scope, переводит в `Confirmed` или `Rejected` и для подтверждённых публикует `BookingConfirmed` в Kafka. Клиент опрашивает `GET /bookings/{id}`.
+`POST /events/{id}/book` не обрабатывает бронь синхронно: создаётся `Booking` в статусе `Pending` и сразу возвращается `202`. `BookingProcessingBackgroundService` каждые 5 секунд находит брони `Pending`, обрабатывает каждую в отдельном scope, переводит в `Confirmed` или `Rejected` и для подтверждённых сохраняет `BookingConfirmed` в `OutboxMessages` в одной транзакции со статусом. В Kafka сообщение отправляет `OutboxPublisherBackgroundService`. Клиент опрашивает `GET /bookings/{id}`.
 
 ## Сквозной сценарий (PowerShell)
 
@@ -294,6 +296,8 @@ docker compose logs events-service | Select-String "Reserved"
 
 Проверка устойчивости: остановите Events (`docker compose stop events-service`), создайте и подтвердите ещё одну бронь, затем запустите сервис (`docker compose start events-service`). Подписчик прочитает сохранённое сообщение, и места уменьшатся уже после старта.
 
+Так же проверяется outbox в Bookings: остановите Kafka (`docker compose stop kafka`) и создайте бронь. Она станет `Confirmed`, а в `OutboxMessages` останется запись с `ProcessedAt = null` (растёт `Attempts`). После `docker compose start kafka` запись получит `ProcessedAt`, а места в Events уменьшатся ровно один раз.
+
 ## Формат ошибок
 
 Все сервисы возвращают ошибки в формате Problem Details (RFC 9110) с полями `type`, `title`, `status`, `detail`, `instance` и `traceId`.
@@ -323,6 +327,6 @@ dotnet test UsersService/UsersService.Tests
 dotnet test UsersService/UsersService.IntegrationTests
 ```
 
-Покрытие: правила бронирования и отмены, подтверждение брони, публикация `BookingConfirmed` (через тестовый издатель), обработчик `BookingConfirmed` в Events (списание мест, событие не найдено, нехватка мест, неверное число мест, повторная и параллельная доставка одного сообщения), репозитории на реальной PostgreSQL, HTTP-тесты авторизации (401, 403, чужая бронь, повторная регистрация, неверный пароль).
+Покрытие: правила бронирования и отмены, подтверждение брони, запись `BookingConfirmed` в outbox в одной транзакции с подтверждением брони, обработчик `BookingConfirmed` в Events (списание мест, событие не найдено, нехватка мест, неверное число мест, повторная и параллельная доставка одного сообщения), репозитории на реальной PostgreSQL, HTTP-тесты авторизации (401, 403, чужая бронь, повторная регистрация, неверный пароль).
 
 Если Docker не запущен, интеграционные тесты завершатся ошибкой `DockerUnavailableException`: запустите Docker Desktop и проверьте `docker ps`.

@@ -14,7 +14,11 @@ public sealed class OutboxPublisherBackgroundService : BackgroundService
 {
     private const int BatchSize = 20;
     private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan FailureDelay = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan MinFailureDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MaxFailureDelay = TimeSpan.FromSeconds(60);
+    private const int SummaryLogEveryNthFailure = 10;
+
+    private int _consecutiveFailures;
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxPublisherBackgroundService> _logger;
@@ -39,8 +43,22 @@ public sealed class OutboxPublisherBackgroundService : BackgroundService
             {
                 var (sent, failed) = await PublishBatchAsync(stoppingToken);
 
-                if (failed) delay = FailureDelay;
-                else if (sent == BatchSize) continue;
+                if (failed)
+                {
+                    delay = GetBackoffDelay();
+                }
+                else
+                {
+                    if (_consecutiveFailures > 0)
+                    {
+                        _logger.LogInformation(
+                            "Outbox publishing recovered after {Failures} consecutive failures.",
+                            _consecutiveFailures);
+                        _consecutiveFailures = 0;
+                    }
+
+                    if (sent == BatchSize) continue;
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -48,8 +66,9 @@ public sealed class OutboxPublisherBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
+                _consecutiveFailures++;
                 _logger.LogError(ex, "Outbox publishing cycle failed.");
-                delay = FailureDelay;
+                delay = GetBackoffDelay();
             }
 
             try { await Task.Delay(delay, stoppingToken); }
@@ -57,6 +76,13 @@ public sealed class OutboxPublisherBackgroundService : BackgroundService
         }
 
         _logger.LogInformation("OutboxPublisherBackgroundService stopped.");
+    }
+
+    private TimeSpan GetBackoffDelay()
+    {
+        var exponent = Math.Min(Math.Max(_consecutiveFailures - 1, 0), 6);
+        var seconds = MinFailureDelay.TotalSeconds * Math.Pow(2, exponent);
+        return TimeSpan.FromSeconds(Math.Min(seconds, MaxFailureDelay.TotalSeconds));
     }
 
     private async Task<(int Sent, bool Failed)> PublishBatchAsync(CancellationToken stoppingToken)
@@ -90,9 +116,21 @@ public sealed class OutboxPublisherBackgroundService : BackgroundService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                _consecutiveFailures++;
                 message.MarkFailed(ex.Message);
-                _logger.LogWarning(ex, "Failed to publish outbox message {MessageId} (attempt {Attempts}).",
-                    message.Id, message.Attempts);
+
+                if (_consecutiveFailures == 1)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to publish outbox message {MessageId} (attempt {Attempts}). Retrying with backoff.",
+                        message.Id, message.Attempts);
+                }
+                else if (_consecutiveFailures % SummaryLogEveryNthFailure == 0)
+                {
+                    _logger.LogWarning(
+                        "Outbox message {MessageId} is still not published: {Error} (consecutive failures: {Failures}, attempt {Attempts}).",
+                        message.Id, ex.Message, _consecutiveFailures, message.Attempts);
+                }
                 failed = true;
                 break;
             }

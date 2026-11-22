@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using EventsService.Infrastructure.DataAccess;
 using EventsService.Application;
+using EventsService.Infrastructure.Caching;
 using EventsService.Infrastructure;
 using EventsService.Infrastructure.Messaging;
 using EventsService.Infrastructure.Security;
@@ -37,6 +38,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
+builder.Services.AddRedisConnection(builder.Configuration.GetConnectionString("Redis"));
 
 builder.Services
     .AddOptions<JwtOptions>()

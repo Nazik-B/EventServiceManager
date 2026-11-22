@@ -117,7 +117,7 @@ docker compose ps
 docker compose up -d events-db users-db bookings-db zookeeper kafka
 ```
 
-Затем запускайте сервисы через `dotnet run --project <Service>/<Service>.Presentation`. Порты баз на хосте разные (5432, 5433, 5434), поэтому строку подключения Users и Bookings нужно переопределить (переменная `ConnectionStrings__DefaultConnection` или правка порта в `appsettings.json`). Адрес Kafka с хоста: `localhost:9092`.
+Затем запускайте сервисы через `dotnet run --project <Service>/<Service>.Presentation`. Порты баз на хосте разные (5432, 5433, 5434), и подходящие строки подключения уже заданы в `appsettings.Development.json` каждого сервиса, поэтому при `dotnet run` в окружении `Development` их переопределять не нужно. Адрес Kafka с хоста: `localhost:9092`.
 
 ## Схема баз и миграции
 

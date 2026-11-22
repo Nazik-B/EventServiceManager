@@ -93,12 +93,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<EventsDbContext>();
-    await db.Database.MigrateAsync();
-}
-
 app.Run();
 
 public partial class Program { }

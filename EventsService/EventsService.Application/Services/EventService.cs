@@ -2,17 +2,29 @@
 using EventsService.Domain.Entities;
 using EventsService.Application.Dto;
 using EventsService.Domain.Exceptions;
+using EventsService.Application.Abstractions;
+using EventsService.Application.Caching;
 using EventsService.Application.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace EventsService.Application.Services;
 
 public class EventService : IEventService
 {
-    private readonly IEventRepository _eventRepository;
+    private const int TopEventsCount = 10;
 
-    public EventService(IEventRepository eventRepository)
+    private readonly IEventRepository _eventRepository;
+    private readonly ICacheService _cache;
+    private readonly CacheOptions _cacheOptions;
+
+    public EventService(
+        IEventRepository eventRepository,
+        ICacheService cache,
+        IOptions<CacheOptions> cacheOptions)
     {
         _eventRepository = eventRepository;
+        _cache = cache;
+        _cacheOptions = cacheOptions.Value;
     }
 
     public async Task<PaginatedResult<EventResponse>> GetAllAsync(
@@ -50,11 +62,40 @@ public class EventService : IEventService
 
     public async Task<EventResponse?> GetByIdAsync(Guid id)
     {
-        var eventItem = await _eventRepository.GetByIdAsync(id);
+        var key = CacheKeys.Event(id);
 
-        return eventItem is null
-            ? null
-            : MapToResponse(eventItem);
+        var cached = await _cache.GetAsync<EventResponse>(key);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var eventItem = await _eventRepository.GetByIdAsync(id);
+        if (eventItem is null)
+        {
+            return null;
+        }
+
+        var response = MapToResponse(eventItem);
+        await _cache.SetAsync(key, response, TimeSpan.FromSeconds(_cacheOptions.EventTtlSeconds));
+
+        return response;
+    }
+
+    public async Task<IReadOnlyList<EventResponse>> GetTopAsync()
+    {
+        var cached = await _cache.GetAsync<List<EventResponse>>(CacheKeys.TopEvents);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var items = await _eventRepository.GetTopBySalesAsync(TopEventsCount);
+        var response = items.Select(MapToResponse).ToList();
+
+        await _cache.SetAsync(CacheKeys.TopEvents, response, TimeSpan.FromSeconds(_cacheOptions.TopEventsTtlSeconds));
+
+        return response;
     }
 
     public async Task<EventResponse> CreateAsync(CreateEventRequest request)
@@ -71,6 +112,7 @@ public class EventService : IEventService
 
         await _eventRepository.AddAsync(eventItem);
         await _eventRepository.SaveChangesAsync();
+        await _cache.RemoveAsync(CacheKeys.TopEvents);
 
         return MapToResponse(eventItem);
     }
@@ -92,6 +134,7 @@ public class EventService : IEventService
         existing.EndAt = request.EndAt!.Value;
 
         await _eventRepository.SaveChangesAsync();
+        await InvalidateEventAsync(id);
 
         return true;
     }
@@ -107,6 +150,7 @@ public class EventService : IEventService
 
         _eventRepository.Delete(existing);
         await _eventRepository.SaveChangesAsync();
+        await InvalidateEventAsync(id);
 
         return true;
     }
@@ -126,6 +170,7 @@ public class EventService : IEventService
         if (reserved)
         {
             await _eventRepository.SaveChangesAsync();
+            await InvalidateEventAsync(eventId);
         }
 
         return reserved;
@@ -143,8 +188,15 @@ public class EventService : IEventService
         eventItem.ReleaseSeats();
 
         await _eventRepository.SaveChangesAsync();
+        await InvalidateEventAsync(eventId);
 
         return true;
+    }
+
+    private async Task InvalidateEventAsync(Guid id)
+    {
+        await _cache.RemoveAsync(CacheKeys.Event(id));
+        await _cache.RemoveAsync(CacheKeys.TopEvents);
     }
 
     private static EventResponse MapToResponse(Event eventItem) => new()

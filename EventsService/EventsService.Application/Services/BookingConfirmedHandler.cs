@@ -1,4 +1,6 @@
 ﻿using EventServiceManager.Contracts;
+using EventsService.Application.Abstractions;
+using EventsService.Application.Caching;
 using EventsService.Application.Repositories;
 
 namespace EventsService.Application.Services;
@@ -7,13 +9,16 @@ public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
 {
     private readonly IEventRepository _eventRepository;
     private readonly IProcessedBookingRepository _processedBookings;
+    private readonly ICacheService _cache;
 
     public BookingConfirmedHandler(
         IEventRepository eventRepository,
-        IProcessedBookingRepository processedBookings)
+        IProcessedBookingRepository processedBookings,
+        ICacheService cache)
     {
         _eventRepository = eventRepository;
         _processedBookings = processedBookings;
+        _cache = cache;
     }
 
     public async Task<BookingConfirmedResult> HandleAsync(
@@ -51,6 +56,10 @@ public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
         {
             return BookingConfirmedResult.Duplicate;
         }
+
+        // Invalidate after the commit; no cancellation token, so shutdown cannot leave a stale entry.
+        await _cache.RemoveAsync(CacheKeys.Event(message.EventId));
+        await _cache.RemoveAsync(CacheKeys.TopEvents);
 
         return BookingConfirmedResult.SeatsReserved;
     }

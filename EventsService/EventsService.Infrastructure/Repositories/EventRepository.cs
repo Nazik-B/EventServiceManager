@@ -69,6 +69,18 @@ public sealed class EventRepository : IEventRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Event>> GetTopBySalesAsync(int count, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Events
+            .AsNoTracking()
+            .Where(e => e.TotalSeats > 0)
+            .OrderByDescending(e => (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .ThenBy(e => e.StartAt)
+            .ThenBy(e => e.Id)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Event eventItem)
     {
         await _dbContext.Events.AddAsync(eventItem);

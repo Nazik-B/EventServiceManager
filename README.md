@@ -72,6 +72,55 @@ EventServiceManager/
 - Очистка обработанных записей `OutboxMessages` и обработка «мёртвых» сообщений (ограничение числа попыток) не реализованы: таблица растёт, а недоставляемое сообщение повторяется бесконечно.
 - Удаление события в Events не удаляет брони в Bookings: у сервисов разные базы.
 
+## Кеширование (Redis)
+
+EventsService кеширует чтения в Redis по схеме cache-aside: сначала читается ключ, при промахе данные берутся из PostgreSQL и записываются в Redis с TTL. Кеш общий для всех экземпляров сервиса.
+
+| Ключ | Эндпоинт | TTL по умолчанию | Что хранится |
+|---|---|---|---|
+| `event:{id}` | `GET /events/{id}` | 300 с | Событие целиком |
+| `events:top10` | `GET /events/top` | 60 с | Десять событий с наибольшей долей проданных мест |
+
+Топ-10 сортируется по убыванию доли проданных мест `(totalSeats - availableSeats) / totalSeats`. Несуществующее событие (404) в кеш не записывается. Пустой топ кешируется как пустой список.
+
+### Инвалидация
+
+Ключи удаляются сразу после изменения данных, не дожидаясь TTL.
+
+| Операция | Удаляемые ключи |
+|---|---|
+| Создание события | `events:top10` |
+| Обновление, удаление события | `event:{id}`, `events:top10` |
+| Списание мест по сообщению `BookingConfirmed` | `event:{id}`, `events:top10` |
+| Освобождение места | `event:{id}`, `events:top10` |
+
+Если места не списаны (повторное сообщение с тем же `BookingId` или нехватка мест), данные не менялись и кеш не трогается. Обновление несуществующего события тоже не сбрасывает кеш.
+
+### Отказоустойчивость
+
+Redis не является обязательной зависимостью. Ошибки подключения, чтения, записи и удаления ключей логируются и не прерывают запрос: сервис отвечает данными из базы. После возвращения Redis подключение восстанавливается само (`abortConnect=false`), и кеш наполняется заново.
+
+### Конфигурация
+
+| Параметр | Назначение |
+|---|---|
+| `ConnectionStrings__Redis` | Адрес Redis. В Docker: `redis:6379,abortConnect=false`. |
+| `Cache__EventTtlSeconds` (`Cache:EventTtlSeconds`, по умолчанию 300) | TTL ключа `event:{id}`. |
+| `Cache__TopEventsTtlSeconds` (`Cache:TopEventsTtlSeconds`, по умолчанию 60) | TTL ключа `events:top10`. |
+
+Сервис `redis` в `docker-compose.yml`: образ `redis:7-alpine`, порт `6379`, без сохранения данных на диск, лимит памяти 128 МБ с вытеснением давно не использованных ключей (`allkeys-lru`). Events стартует после готовности Redis, но продолжает работать, если Redis позже остановится.
+
+Состояние кеша можно посмотреть так:
+
+```powershell
+docker exec eventapi-redis redis-cli keys "*"
+docker exec eventapi-redis redis-cli ttl events:top10
+```
+
+### Ограничения
+
+- Если инвалидация происходит между чтением из базы и записью в кеш, в Redis может попасть устаревшее значение. Оно живёт не дольше своего TTL.
+- Кеш хранит данные событий, а не результаты бронирования: статусы броней по-прежнему читаются из Bookings.
 ## Стек технологий
 
 - .NET 10 / ASP.NET Core Web API, Swashbuckle (Swagger UI)
@@ -90,7 +139,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Первая сборка занимает несколько минут. Поднимаются три базы PostgreSQL, Zookeeper, Kafka и три сервиса. Сервисы стартуют после готовности баз и Kafka (healthcheck), миграции применяются автоматически при старте.
+Первая сборка занимает несколько минут. Поднимаются три базы PostgreSQL, Zookeeper, Kafka, Redis и три сервиса. Сервисы стартуют после готовности баз и Kafka (healthcheck), миграции применяются автоматически при старте.
 
 | Что | Адрес |
 |---|---|
@@ -98,6 +147,7 @@ docker compose ps
 | Events | `http://localhost:5001` (Swagger: `/swagger`) |
 | Bookings | `http://localhost:5002` (Swagger: `/swagger`) |
 | Kafka (с хоста) | `localhost:9092` |
+| Redis (с хоста) | `localhost:6379` |
 | PostgreSQL | events — `5432`, users — `5433`, bookings — `5434` |
 
 Остановить систему: `docker compose down` (добавьте `-v`, чтобы удалить данные баз).
@@ -110,11 +160,12 @@ docker compose ps
 | `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`, `Jwt__LifetimeMinutes` | Параметры токена (одинаковые во всех сервисах) |
 | `Kafka__BootstrapServers` | Адрес брокера внутри сети Docker: `kafka:29092` |
 | `Kafka__ConsumerGroup` | Группа подписчика Events: `events-service` |
+| `ConnectionStrings__Redis` | Адрес Redis для кеша Events: `redis:6379,abortConnect=false` |
 
 Для локальной отладки без контейнеров сервисов поднимите только инфраструктуру:
 
 ```bash
-docker compose up -d events-db users-db bookings-db zookeeper kafka
+docker compose up -d events-db users-db bookings-db zookeeper kafka redis
 ```
 
 Затем запускайте сервисы через `dotnet run --project <Service>/<Service>.Presentation`. Порты баз на хосте разные (5432, 5433, 5434), и подходящие строки подключения уже заданы в `appsettings.Development.json` каждого сервиса, поэтому при `dotnet run` в окружении `Development` их переопределять не нужно. Адрес Kafka с хоста: `localhost:9092`.
@@ -178,7 +229,8 @@ dotnet ef database update \
 | Метод | URL | Описание | Доступ | Успех | Ошибки |
 |---|---|---|---|---|---|
 | GET | `/events` | Список (фильтры, пагинация) | все | 200 | — |
-| GET | `/events/{id}` | Событие по id | все | 200 | 404 |
+| GET | `/events/{id}` | Событие по id (кеш `event:{id}`) | все | 200 | 404 |
+| GET | `/events/top` | Топ-10 по доле проданных мест (кеш `events:top10`) | все | 200 | — |
 | POST | `/events` | Создать | Admin | 201 | 400, 401, 403 |
 | PUT | `/events/{id}` | Обновить | Admin | 204 | 400, 401, 403, 404 |
 | DELETE | `/events/{id}` | Удалить | Admin | 204 | 401, 403, 404 |

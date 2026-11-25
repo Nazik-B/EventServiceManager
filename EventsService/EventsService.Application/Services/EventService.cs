@@ -112,8 +112,8 @@ public class EventService : IEventService
 
         await _eventRepository.AddAsync(eventItem);
         await _eventRepository.SaveChangesAsync();
-        await _cache.RemoveAsync(CacheKeys.TopEvents);
 
+        // events:top10 is not invalidated: the ranking refreshes by TTL only.
         return MapToResponse(eventItem);
     }
 
@@ -196,7 +196,6 @@ public class EventService : IEventService
     private async Task InvalidateEventAsync(Guid id)
     {
         await _cache.RemoveAsync(CacheKeys.Event(id));
-        await _cache.RemoveAsync(CacheKeys.TopEvents);
     }
 
     private static EventResponse MapToResponse(Event eventItem) => new()

@@ -33,10 +33,10 @@ public class EventServiceCacheTests
         Cache.Seed(CacheKeys.TopEvents, new object());
     }
 
-    private void AssertBothRemoved(Guid id)
+    private void AssertEventRemovedTopKept(Guid id)
     {
         Assert.False(Cache.Contains(CacheKeys.Event(id)));
-        Assert.False(Cache.Contains(CacheKeys.TopEvents));
+        Assert.True(Cache.Contains(CacheKeys.TopEvents));
     }
 
     private void AssertBothKept(Guid id)
@@ -157,7 +157,7 @@ public class EventServiceCacheTests
     }
 
     [Fact]
-    public async Task CreateAsync_InvalidatesTopCache()
+    public async Task CreateAsync_DoesNotTouchTopCache()
     {
         using var scope = _provider.CreateScope();
         var service = Service(scope);
@@ -165,11 +165,11 @@ public class EventServiceCacheTests
 
         await CreateEventAsync(service, "New");
 
-        Assert.False(Cache.Contains(CacheKeys.TopEvents));
+        Assert.True(Cache.Contains(CacheKeys.TopEvents));
     }
 
     [Fact]
-    public async Task UpdateAsync_InvalidatesEventAndTopCache()
+    public async Task UpdateAsync_InvalidatesEventCacheOnly()
     {
         using var scope = _provider.CreateScope();
         var service = Service(scope);
@@ -184,7 +184,7 @@ public class EventServiceCacheTests
         });
 
         Assert.True(updated);
-        AssertBothRemoved(created.Id);
+        AssertEventRemovedTopKept(created.Id);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public class EventServiceCacheTests
     }
 
     [Fact]
-    public async Task DeleteAsync_InvalidatesEventAndTopCache()
+    public async Task DeleteAsync_InvalidatesEventCacheOnly()
     {
         using var scope = _provider.CreateScope();
         var service = Service(scope);
@@ -236,11 +236,11 @@ public class EventServiceCacheTests
         var deleted = await service.DeleteAsync(created.Id);
 
         Assert.True(deleted);
-        AssertBothRemoved(created.Id);
+        AssertEventRemovedTopKept(created.Id);
     }
 
     [Fact]
-    public async Task TryReserveSeatAsync_WhenReserved_InvalidatesEventAndTopCache()
+    public async Task TryReserveSeatAsync_WhenReserved_InvalidatesEventCacheOnly()
     {
         using var scope = _provider.CreateScope();
         var service = Service(scope);
@@ -249,7 +249,7 @@ public class EventServiceCacheTests
 
         Assert.True(await service.TryReserveSeatAsync(created.Id));
 
-        AssertBothRemoved(created.Id);
+        AssertEventRemovedTopKept(created.Id);
     }
 
     [Fact]
@@ -267,7 +267,7 @@ public class EventServiceCacheTests
     }
 
     [Fact]
-    public async Task ReleaseSeatAsync_InvalidatesEventAndTopCache()
+    public async Task ReleaseSeatAsync_InvalidatesEventCacheOnly()
     {
         using var scope = _provider.CreateScope();
         var service = Service(scope);
@@ -277,6 +277,6 @@ public class EventServiceCacheTests
 
         Assert.True(await service.ReleaseSeatAsync(created.Id));
 
-        AssertBothRemoved(created.Id);
+        AssertEventRemovedTopKept(created.Id);
     }
 }

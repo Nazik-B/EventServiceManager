@@ -48,7 +48,7 @@ public class BookingConfirmedCacheInvalidationTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task SeatsReserved_InvalidatesEventAndTopCache()
+    public async Task SeatsReserved_InvalidatesEventCacheOnly()
     {
         var ev = await SeedEventAsync(5);
         SeedCache(ev.Id);
@@ -57,7 +57,7 @@ public class BookingConfirmedCacheInvalidationTests : IntegrationTestBase
 
         Assert.Equal(BookingConfirmedResult.SeatsReserved, result);
         Assert.False(Cache.Contains(CacheKeys.Event(ev.Id)));
-        Assert.False(Cache.Contains(CacheKeys.TopEvents));
+        Assert.True(Cache.Contains(CacheKeys.TopEvents));
     }
 
     [Fact]

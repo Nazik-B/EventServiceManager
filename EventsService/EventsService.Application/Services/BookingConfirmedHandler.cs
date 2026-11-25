@@ -57,9 +57,9 @@ public sealed class BookingConfirmedHandler : IBookingConfirmedHandler
             return BookingConfirmedResult.Duplicate;
         }
 
-        // Invalidate after the commit; no cancellation token, so shutdown cannot leave a stale entry.
+        // Invalidate the event key after the commit; no cancellation token, so shutdown cannot leave a stale entry.
+        // events:top10 is intentionally left to expire by TTL.
         await _cache.RemoveAsync(CacheKeys.Event(message.EventId));
-        await _cache.RemoveAsync(CacheKeys.TopEvents);
 
         return BookingConfirmedResult.SeatsReserved;
     }

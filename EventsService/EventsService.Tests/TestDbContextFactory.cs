@@ -1,4 +1,6 @@
-﻿using EventsService.Application.Repositories;
+﻿using EventsService.Application.Abstractions;
+using EventsService.Application.Caching;
+using EventsService.Application.Repositories;
 using EventsService.Application.Services;
 using EventsService.Infrastructure.DataAccess;
 using EventsService.Infrastructure.Repositories;
@@ -21,6 +23,10 @@ public static class TestDbContextFactory
 
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventService, EventServiceImplementation>();
+
+        services.AddSingleton<InMemoryCacheService>();
+        services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<InMemoryCacheService>());
+        services.AddOptions<CacheOptions>();
 
         return services.BuildServiceProvider();
     }

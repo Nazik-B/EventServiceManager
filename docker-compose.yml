@@ -1,6 +1,6 @@
-﻿# Full system: infrastructure (Postgres x3, Zookeeper, Kafka) and the three services.
+﻿# Full system: infrastructure (Postgres x3, Zookeeper, Kafka, Redis) and the three services.
 # Run everything: docker compose up -d --build
-# Infrastructure only for local debugging: docker compose up -d events-db users-db bookings-db zookeeper kafka
+# Infrastructure only for local debugging: docker compose up -d events-db users-db bookings-db zookeeper kafka redis
 x-jwt: &jwt
   Jwt__Secret: dev-only-secret-change-me-0123456789abcdef
   Jwt__Issuer: EventsApi
@@ -101,6 +101,19 @@ services:
       timeout: 10s
       retries: 12
 
+  redis:
+    image: redis:7-alpine
+    container_name: eventapi-redis
+    # Cache only: no persistence, bounded memory, evict least recently used keys.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   users-service:
     build:
       context: .
@@ -127,11 +140,14 @@ services:
     depends_on:
       events-db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
       <<: *jwt
       ConnectionStrings__DefaultConnection: Host=events-db;Port=5432;Database=events;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
+      ConnectionStrings__Redis: redis:6379,abortConnect=false
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerGroup: events-service
     ports:

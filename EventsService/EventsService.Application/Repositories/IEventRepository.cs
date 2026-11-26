@@ -19,5 +19,7 @@ public interface IEventRepository
 
     void Delete(Event eventItem);
 
+    Task<IReadOnlyList<Event>> GetTopBySalesAsync(int count, CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync();
 }

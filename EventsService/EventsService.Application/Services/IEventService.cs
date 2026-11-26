@@ -13,6 +13,8 @@ public interface IEventService
 
     Task<EventResponse?> GetByIdAsync(Guid id);
 
+    Task<IReadOnlyList<EventResponse>> GetTopAsync();
+
     Task<EventResponse> CreateAsync(CreateEventRequest request);
 
     Task<bool> UpdateAsync(Guid id, UpdateEventRequest request);

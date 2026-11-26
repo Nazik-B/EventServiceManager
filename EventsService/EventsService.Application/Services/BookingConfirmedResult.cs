@@ -5,5 +5,6 @@ public enum BookingConfirmedResult
     SeatsReserved,
     EventNotFound,
     NoAvailableSeats,
-    InvalidMessage
+    InvalidMessage,
+    Duplicate
 }

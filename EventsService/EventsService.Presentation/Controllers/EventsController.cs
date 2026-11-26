@@ -30,6 +30,14 @@ public class EventsController : ControllerBase
         return Ok(result);
     }
 
+    // GET /events/top
+    [HttpGet("top")]
+    public async Task<IActionResult> GetTop()
+    {
+        var result = await _eventService.GetTopAsync();
+        return Ok(result);
+    }
+
     // GET /events/{id}
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)

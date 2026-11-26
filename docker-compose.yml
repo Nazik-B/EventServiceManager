@@ -1,6 +1,6 @@
-﻿# Full system: infrastructure (Postgres x3, Zookeeper, Kafka) and the three services.
+# Full system: infrastructure (Postgres x3, Zookeeper, Kafka, Redis) and the three services.
 # Run everything: docker compose up -d --build
-# Infrastructure only for local debugging: docker compose up -d events-db users-db bookings-db kafka
+# Infrastructure only for local debugging: docker compose up -d events-db users-db bookings-db zookeeper kafka redis
 x-jwt: &jwt
   Jwt__Secret: dev-only-secret-change-me-0123456789abcdef
   Jwt__Issuer: EventsApi
@@ -21,10 +21,12 @@ services:
     volumes:
       - events-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      # -h localhost: probe TCP, not the unix socket of the temporary init server
+      test: ["CMD-SHELL", "pg_isready -h localhost -U postgres -d events"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   users-db:
     image: postgres:16
@@ -38,10 +40,11 @@ services:
     volumes:
       - users-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U postgres -d users"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   bookings-db:
     image: postgres:16
@@ -55,10 +58,11 @@ services:
     volumes:
       - bookings-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U postgres -d bookings"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -97,12 +101,26 @@ services:
       timeout: 10s
       retries: 12
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
+    # Cache only: no persistence, bounded memory, evict least recently used keys.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   users-service:
     build:
       context: .
       args:
         PROJECT: UsersService/UsersService.Presentation
     container_name: eventapi-users-service
+    restart: on-failure
     depends_on:
       users-db:
         condition: service_healthy
@@ -118,14 +136,18 @@ services:
       args:
         PROJECT: EventsService/EventsService.Presentation
     container_name: eventapi-events-service
+    restart: on-failure
     depends_on:
       events-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
       <<: *jwt
       ConnectionStrings__DefaultConnection: Host=events-db;Port=5432;Database=events;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
+      ConnectionStrings__Redis: redis:6379,abortConnect=false
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerGroup: events-service
     ports:
@@ -137,6 +159,7 @@ services:
       args:
         PROJECT: BookingsService/BookingsService.Presentation
     container_name: eventapi-bookings-service
+    restart: on-failure
     depends_on:
       bookings-db:
         condition: service_healthy
@@ -144,8 +167,8 @@ services:
         condition: service_healthy
     environment:
       <<: *jwt
-      ConnectionStrings__DefaultConnection: Host=bookings-db;Port=5432;Database=bookings;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
+      ConnectionStrings__DefaultConnection: Host=bookings-db;Port=5432;Database=bookings;Username=postgres;Password=postgres;GSS Encryption Mode=Disable
     ports:
       - "5002:8080"
 
@@ -153,5 +176,3 @@ volumes:
   events-db-data:
   users-db-data:
   bookings-db-data:
-
-

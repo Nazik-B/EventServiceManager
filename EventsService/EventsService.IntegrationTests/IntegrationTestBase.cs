@@ -1,9 +1,13 @@
 ﻿using EventsService.Infrastructure.DataAccess;
 using EventsService.Infrastructure.Repositories;
+using EventsService.Application.Abstractions;
 using EventsService.Application.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using EventsService.Application;
+using EventsService.Application.Services;
+using EventsService.Infrastructure;
 
 namespace EventsService.IntegrationTests;
 
@@ -24,6 +28,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             options.UseNpgsql(fixture.ConnectionString));
 
         services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IProcessedBookingRepository, ProcessedBookingRepository>();
+        services.AddScoped<IBookingConfirmedHandler, BookingConfirmedHandler>();
+
+        services.AddSingleton<InMemoryCacheService>();
+        services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<InMemoryCacheService>());
 
         Services = services.BuildServiceProvider();
         DbContext = Services.GetRequiredService<EventsDbContext>();

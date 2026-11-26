@@ -11,6 +11,7 @@ public sealed class EventsDbContext : DbContext
     }
 
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<ProcessedBooking> ProcessedBookings => Set<ProcessedBooking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +22,8 @@ public sealed class EventsDbContext : DbContext
             .HasColumnType("xid")
             .ValueGeneratedOnAddOrUpdate()
             .IsConcurrencyToken();
+
+        modelBuilder.Entity<ProcessedBooking>().HasKey(x => x.BookingId);
 
         base.OnModelCreating(modelBuilder);
     }

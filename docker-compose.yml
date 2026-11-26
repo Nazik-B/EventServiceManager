@@ -1,4 +1,4 @@
-﻿# Full system: infrastructure (Postgres x3, Zookeeper, Kafka, Redis) and the three services.
+# Full system: infrastructure (Postgres x3, Zookeeper, Kafka, Redis) and the three services.
 # Run everything: docker compose up -d --build
 # Infrastructure only for local debugging: docker compose up -d events-db users-db bookings-db zookeeper kafka redis
 x-jwt: &jwt
@@ -102,7 +102,7 @@ services:
       retries: 12
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: eventapi-redis
     # Cache only: no persistence, bounded memory, evict least recently used keys.
     command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
